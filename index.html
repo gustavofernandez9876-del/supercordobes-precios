@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Consulta de precios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --papel:#F7F4EE;
+  --tinta:#16130F;
+  --gris:#6B655C;
+  --linea:#D8D2C6;
+  --rojo:#C4161C;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--papel);
+  color:var(--tinta);
+  font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+#captura{position:fixed;top:-200px;left:0;width:10px;height:10px;opacity:0}
+
+.pantalla{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ---------- barra superior ---------- */
+.barra{
+  flex:0 0 auto;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  padding:14px 26px 12px;
+  border-bottom:2px solid var(--tinta);
+}
+.marca{font-family:'Archivo Narrow';font-weight:700;font-size:20px;letter-spacing:.02em}
+.estado{font-size:13px;color:var(--gris)}
+.estado b{color:var(--tinta);font-weight:600}
+
+/* ---------- cuerpo ---------- */
+.cuerpo{
+  flex:1 1 auto;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px 26px;
+}
+.vista{display:none;width:100%;text-align:center}
+.vista.activa{display:block}
+
+/* espera */
+#espera .glifo{
+  display:flex;gap:7px;justify-content:center;align-items:flex-end;
+  height:60px;margin-bottom:16px;
+}
+#espera .glifo i{display:block;width:6px;background:var(--tinta);border-radius:1px}
+#espera .invita{
+  font-family:'Archivo Narrow';font-weight:700;
+  font-size:clamp(30px,6vw,56px);line-height:1.05;
+}
+#espera .sub{margin-top:12px;font-size:17px;color:var(--gris)}
+
+/* resultado */
+#ficha .nombre{
+  font-family:'Archivo Narrow';font-weight:700;
+  font-size:clamp(24px,4.6vw,44px);
+  line-height:1.08;
+  max-width:22ch;margin:0 auto 4px;
+}
+#ficha .rubro{font-size:15px;color:var(--gris);margin-bottom:10px}
+#ficha .bloques{display:flex;gap:18px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin-top:6px}
+#ficha .bloque{border-radius:14px;padding:10px 22px 14px;min-width:40%}
+#ficha .bloque .et{font-family:'Archivo Narrow';font-weight:700;font-size:clamp(16px,2.4vw,24px);letter-spacing:.04em}
+#ficha .bloque .val{font-weight:800;font-size:clamp(50px,9vw,108px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#ficha .bloque .val span{font-size:.45em;vertical-align:.5em;margin-right:.06em}
+#ficha .b-lista{background:#fff;border:3px solid var(--tinta);color:var(--tinta)}
+#ficha .b-lista .et{color:var(--gris)}
+#ficha .b-cont{background:#0F7A33;color:#fff;box-shadow:0 6px 0 #0A5524}
+#ficha .b-cont .et{color:#FFE14D}
+#ficha .b-cont .val{font-size:clamp(56px,10.5vw,124px)}
+#ficha .b-cont.verd{background:#E8590C;box-shadow:0 6px 0 #A63F08}
+.promo{margin-top:30px;display:inline-block;border-radius:18px;overflow:hidden;box-shadow:0 6px 0 rgba(0,0,0,.18)}
+.promo .t{background:#C4161C;color:#fff;font-family:'Archivo Narrow';font-weight:700;font-size:clamp(24px,4vw,40px);letter-spacing:.06em;padding:8px 30px}
+.promo .t small{display:block;font-size:.5em;color:#FFE14D;letter-spacing:.08em}
+.promo .fila{display:flex}
+.promo .c{flex:1;padding:10px 26px;color:#fff;font-weight:800;font-size:clamp(20px,3.2vw,32px);line-height:1.1}
+.promo .c b{display:block;font-size:1.8em}
+.promo .c1{background:#1F4E9E}.promo .c2{background:#0F7A33}
+#ficha .pie{
+  margin-top:16px;padding-top:12px;
+  border-top:1px solid var(--linea);
+  display:inline-flex;gap:26px;
+  font-size:14px;color:var(--gris);
+  font-variant-numeric:tabular-nums;
+}
+
+/* sin resultado */
+#nohay .titulo{
+  font-family:'Archivo Narrow';font-weight:700;
+  font-size:clamp(28px,5vw,48px);margin-bottom:10px;
+}
+#nohay .cod{
+  font-size:22px;font-variant-numeric:tabular-nums;
+  color:var(--gris);letter-spacing:.04em;
+}
+#nohay .ayuda{margin-top:18px;font-size:16px;color:var(--gris)}
+
+/* carga */
+#carga{max-width:520px;margin:0 auto;text-align:left}
+#carga h2{font-family:'Archivo Narrow';font-weight:700;font-size:28px;margin-bottom:10px}
+#carga p{font-size:15px;color:var(--gris);line-height:1.5;margin-bottom:18px}
+.boton{
+  display:inline-block;
+  background:var(--tinta);color:var(--papel);
+  border:none;border-radius:2px;
+  font-family:'Archivo';font-weight:600;font-size:16px;
+  padding:13px 22px;cursor:pointer;
+}
+.boton.suave{background:none;color:var(--tinta);border:1.5px solid var(--tinta)}
+.botonera{display:flex;gap:10px;flex-wrap:wrap}
+
+/* barra de progreso del auto-reset */
+#reloj{
+  position:absolute;left:0;bottom:0;height:4px;
+  background:var(--tinta);width:0;
+}
+
+/* pie de pantalla */
+.zocalo{
+  flex:0 0 auto;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 26px 14px;
+  font-size:13px;color:var(--gris);
+}
+.zocalo button{
+  background:none;border:none;color:var(--gris);
+  font-family:'Archivo';font-size:13px;cursor:pointer;
+  text-decoration:underline;padding:4px;
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<link rel="manifest" href="manifest.json"><meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+
+<input id="captura" autocomplete="off" inputmode="none" aria-hidden="true">
+
+<div class="pantalla">
+
+  <div class="barra">
+    <div class="marca">Consulta de precios</div>
+    <div class="estado" id="estado">Cargando lista…</div>
+  </div>
+
+  <div class="cuerpo">
+
+    <div class="vista activa" id="espera">
+      <div class="glifo" id="glifo"></div>
+      <div class="invita">Pasá el producto<br>por el lector</div>
+      <div class="sub">El precio aparece en pantalla</div>
+      <div class="promo"><div class="t">SUPERCORDOBÉS<small>DESCUENTOS PAGANDO EN EFECTIVO</small></div><div class="fila"><div class="c c1">Mercadería<b>-5%</b></div><div class="c c2">Verduras<b>-20%</b></div></div></div>
+    </div>
+
+    <div class="vista" id="ficha">
+      <div class="nombre" id="f-nombre"></div>
+      <div class="rubro" id="f-rubro"></div>
+      <div class="bloques">
+        <div class="bloque b-lista"><div class="et">PRECIO DE LISTA</div><div class="val" id="f-precio"></div></div>
+        <div class="bloque b-cont" id="f-bcont"><div class="et" id="f-etc"></div><div class="val" id="f-contado"></div></div>
+      </div>
+      <div class="pie">
+        <span id="f-cod"></span>
+        <span id="f-ean"></span>
+      </div>
+    </div>
+
+    <div class="vista" id="nohay">
+      <div class="titulo">Producto no encontrado</div>
+      <div class="cod" id="n-cod"></div>
+      <div class="ayuda">Consultá en caja o probá escanear de nuevo</div>
+    </div>
+
+    <div class="vista" id="carga">
+      <h2>Falta la lista de precios</h2>
+      <p id="c-detalle">No se encontró el archivo <b>precios.csv</b> junto a esta página. Subí el archivo exportado de Flexxus para probar ahora, o dejalo en la misma carpeta al publicar.</p>
+      <div class="botonera">
+        <button class="boton" id="btn-archivo">Elegir archivo CSV</button>
+        <button class="boton suave" id="btn-demo">Usar datos de prueba</button>
+      </div>
+      <input type="file" id="file" accept=".csv,.txt,text/csv" hidden>
+    </div>
+
+    <div id="reloj"></div>
+  </div>
+
+  <div class="zocalo">
+    <span id="pie-info">—</span>
+    <button id="btn-manual">Ingresar código a mano</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ============ estado ============ */
+var indice = Object.create(null);   // clave normalizada -> producto
+var total  = 0;
+var origen = '';
+var temporizador = null, animacion = null;
+var SEGUNDOS_VISIBLE = 12;
+
+var $ = function(id){ return document.getElementById(id); };
+
+/* ============ barras decorativas de la pantalla de espera ============ */
+(function dibujarGlifo(){
+  var anchos = [3,6,2,4,7,3,2,5,3,6,4,2,7,3,5,2,4,6,3,2,5,4,7,3,2,6,4,3];
+  var alturas= [86,58,74,86,46,70,86,54,80,62,86,72,50,86,64,78,56,86,68,74,86,52,66,86,60,76,84,86];
+  var g = $('glifo'), h = '';
+  for(var i=0;i<anchos.length;i++){
+    h += '<i style="width:'+anchos[i]+'px;height:'+alturas[i]+'px"></i>';
+  }
+  g.innerHTML = h;
+})();
+
+/* ============ utilidades de texto ============ */
+
+// Detecta el separador de columnas mirando la primera línea.
+function detectarSeparador(linea){
+  var candidatos = ['\t',';',',','|'];
+  var mejor = ';', max = 0;
+  for(var i=0;i<candidatos.length;i++){
+    var n = linea.split(candidatos[i]).length;
+    if(n > max){ max = n; mejor = candidatos[i]; }
+  }
+  return mejor;
+}
+
+// Parte una línea respetando comillas dobles.
+function partirLinea(linea, sep){
+  var campos = [], actual = '', dentro = false;
+  for(var i=0;i<linea.length;i++){
+    var c = linea[i];
+    if(c === '"'){
+      if(dentro && linea[i+1] === '"'){ actual += '"'; i++; }
+      else dentro = !dentro;
+    } else if(c === sep && !dentro){
+      campos.push(actual); actual = '';
+    } else {
+      actual += c;
+    }
+  }
+  campos.push(actual);
+  return campos;
+}
+
+// Quita tildes y pasa a minúsculas, para comparar encabezados.
+function simplificar(s){
+  return (s||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]/g,'');
+}
+
+// "$ 10.550,00" -> 10550    |    "2975,207" -> 2975.207
+function aNumero(texto){
+  if(texto == null) return NaN;
+  var s = String(texto).replace(/[^0-9,.\-]/g,'').trim();
+  if(!s) return NaN;
+  var coma = s.lastIndexOf(','), punto = s.lastIndexOf('.');
+  if(coma > punto){                      // formato argentino: 10.550,00
+    s = s.replace(/\./g,'').replace(',', '.');
+  } else if(punto > coma){               // formato inglés: 10,550.00
+    s = s.replace(/,/g,'');
+  } else {
+    s = s.replace(/,/g,'');
+  }
+  var n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+
+function comoPesos(n){
+  return n.toLocaleString('es-AR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+/* ============ claves de búsqueda ============ */
+
+// Un mismo producto se guarda bajo varias claves para tolerar
+// diferencias entre lo que imprime la etiqueta y lo que devuelve el lector.
+function clavesDe(codigo){
+  var bruto = String(codigo||'').trim();
+  if(!bruto) return [];
+  var claves = [];
+  var mayus = bruto.toUpperCase();
+  claves.push(mayus);
+
+  if(/^\d+$/.test(bruto)){
+    var sinCeros = bruto.replace(/^0+/,'') || '0';
+    claves.push(sinCeros);
+    if(sinCeros.length <= 13) claves.push(sinCeros.padStart(13,'0'));
+    if(sinCeros.length <= 12) claves.push(sinCeros.padStart(12,'0'));
+    if(sinCeros.length <= 8)  claves.push(sinCeros.padStart(8,'0'));
+  }
+  // sin duplicados
+  var vistas = Object.create(null), salida = [];
+  for(var i=0;i<claves.length;i++){
+    if(!vistas[claves[i]]){ vistas[claves[i]] = 1; salida.push(claves[i]); }
+  }
+  return salida;
+}
+
+function buscar(codigo){
+  var claves = clavesDe(codigo);
+  for(var i=0;i<claves.length;i++){
+    if(indice[claves[i]]) return indice[claves[i]];
+  }
+  return null;
+}
+
+/* ============ carga de la lista ============ */
+
+function cargarTexto(texto, deDonde){
+  // saca BOM y normaliza saltos de línea
+  texto = texto.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+  var lineas = texto.split('\n');
+
+  // busca la fila de encabezados: la primera que mencione un código de barra
+  var filaEnc = -1, sep = ';';
+  for(var i=0;i<Math.min(lineas.length,15);i++){
+    if(!lineas[i].trim()) continue;
+    var s = detectarSeparador(lineas[i]);
+    var campos = partirLinea(lineas[i], s).map(simplificar);
+    if(campos.indexOf('codigodebarra') > -1 || campos.indexOf('codigobarras') > -1 ||
+       campos.indexOf('codigodebarras') > -1 || campos.indexOf('codigobarra') > -1){
+      filaEnc = i; sep = s; break;
+    }
+  }
+  if(filaEnc === -1){
+    return {error:'No encontré la columna "Código de Barra" en el archivo.'};
+  }
+
+  var enc = partirLinea(lineas[filaEnc], sep).map(simplificar);
+  var col = function(){
+    for(var a=0;a<arguments.length;a++){
+      var p = enc.indexOf(arguments[a]);
+      if(p > -1) return p;
+    }
+    return -1;
+  };
+
+  var cEan    = col('codigodebarra','codigobarra','codigodebarras','codigobarras');
+  var cNombre = col('descripcion','descripciondelarticulo','articulo','detalle');
+  var cPrecio = col('lista1','precio','precioventa','precioventa1','preciol1','precio1');
+  var cCod    = col('codigo','codigoarticulo','codart');
+  var cRubro  = col('rubro','superrubro','familia');
+
+  if(cEan < 0 || cPrecio < 0){
+    return {error:'Faltan columnas: hacen falta "Código de Barra" y "Lista 1".'};
+  }
+
+  var nuevo = Object.create(null), cuenta = 0, sinPrecio = 0;
+
+  for(var f=filaEnc+1; f<lineas.length; f++){
+    var linea = lineas[f];
+    if(!linea || !linea.trim()) continue;
+    var d = partirLinea(linea, sep);
+
+    var ean = (d[cEan]||'').trim();
+    if(!ean) continue;
+
+    var precio = aNumero(d[cPrecio]);
+    if(isNaN(precio) || precio <= 0){ sinPrecio++; continue; }
+
+    var prod = {
+      ean:    ean,
+      nombre: (d[cNombre]||'').trim() || 'Sin descripción',
+      precio: precio,
+      cod:    cCod   > -1 ? (d[cCod]||'').trim()   : '',
+      rubro:  cRubro > -1 ? (d[cRubro]||'').trim() : ''
+    };
+
+    var claves = clavesDe(ean);
+    for(var k=0;k<claves.length;k++){
+      if(!nuevo[claves[k]]) nuevo[claves[k]] = prod;
+    }
+    cuenta++;
+  }
+
+  if(!cuenta) return {error:'El archivo no tiene filas con código de barra y precio.'};
+
+  indice = nuevo;
+  total  = cuenta;
+  origen = deDonde;
+  return {ok:true, cuenta:cuenta, sinPrecio:sinPrecio};
+}
+
+/* ============ vistas ============ */
+
+function mostrar(cual){
+  var vistas = ['espera','ficha','nohay','carga'];
+  for(var i=0;i<vistas.length;i++){
+    $(vistas[i]).classList.toggle('activa', vistas[i] === cual);
+  }
+}
+
+function detenerReloj(){
+  if(temporizador){ clearTimeout(temporizador); temporizador = null; }
+  if(animacion){ cancelAnimationFrame(animacion); animacion = null; }
+  $('reloj').style.width = '0';
+}
+
+function volverAEsperar(){
+  detenerReloj();
+  mostrar('espera');
+}
+
+function arrancarReloj(){
+  detenerReloj();
+  var inicio = performance.now(), ms = SEGUNDOS_VISIBLE*1000;
+  var barra = $('reloj');
+  (function paso(t){
+    var avance = Math.min(1,(t-inicio)/ms);
+    barra.style.width = ((1-avance)*100)+'%';
+    if(avance < 1) animacion = requestAnimationFrame(paso);
+  })(inicio);
+  temporizador = setTimeout(volverAEsperar, ms);
+}
+
+function mostrarProducto(p){
+  $('f-nombre').textContent = p.nombre;
+  $('f-rubro').textContent  = p.rubro || '';
+  $('f-precio').innerHTML   = '<span>$</span>' + comoPesos(p.precio);
+  var verd = /FRUTAS Y VERDURAS/i.test(p.rubro||'');
+  var pct = verd ? 0.20 : 0.05;
+  $('f-etc').textContent = 'CONTADO EFECTIVO -' + (verd?'20':'5') + '%';
+  $('f-contado').innerHTML = '<span>$</span>' + comoPesos(Math.round(p.precio*(1-pct)));
+  $('f-bcont').className = 'bloque b-cont' + (verd?' verd':'');
+  $('f-bcont').style.display = p.precio ? '' : 'none';
+  $('f-cod').textContent    = p.cod ? 'Código '+p.cod : '';
+  $('f-ean').textContent    = p.ean;
+  mostrar('ficha');
+  arrancarReloj();
+}
+
+function mostrarNoHay(codigo){
+  $('n-cod').textContent = codigo;
+  mostrar('nohay');
+  arrancarReloj();
+}
+
+function actualizarEstado(){
+  if(total){
+    $('estado').innerHTML = '<b>'+total.toLocaleString('es-AR')+'</b> productos';
+    $('pie-info').textContent = origen;
+  } else {
+    $('estado').textContent = 'Sin lista cargada';
+    $('pie-info').textContent = '—';
+  }
+}
+
+/* ============ entrada del lector ============ */
+// DataWedge en modo Keystroke escribe el código como si fuera un teclado
+// y cierra con Enter. Mantenemos un campo invisible siempre enfocado.
+
+var campo = $('captura');
+var dialogoAbierto = false;   // mientras está el cuadro de ingreso manual, no robamos el foco
+
+function enfocar(){
+  if(dialogoAbierto) return;
+  if(document.activeElement === campo) return;
+  try{ campo.focus({preventScroll:true}); }catch(e){ campo.focus(); }
+}
+
+// Al encender, el navegador puede tardar en dejar enfocar: insistimos un rato
+// y después controlamos cada segundo que el campo siga listo.
+(function insistirAlArrancar(){
+  var intentos = 0;
+  var t = setInterval(function(){
+    enfocar();
+    if(++intentos >= 20) clearInterval(t);
+  }, 250);
+})();
+setInterval(enfocar, 1000);
+window.addEventListener('load', enfocar);
+window.addEventListener('pageshow', enfocar);
+window.addEventListener('focus', enfocar);
+
+// Red de seguridad: si por algún motivo el campo no tiene el foco,
+// igual juntamos lo que manda el lector desde cualquier parte de la página.
+var bufferGlobal = '', pausaGlobal = null;
+document.addEventListener('keydown', function(e){
+  if(e.target === campo || dialogoAbierto) return;
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    var v = bufferGlobal; bufferGlobal = '';
+    procesar(v); enfocar();
+    return;
+  }
+  if(e.key && e.key.length === 1){
+    bufferGlobal += e.key;
+    if(pausaGlobal) clearTimeout(pausaGlobal);
+    pausaGlobal = setTimeout(function(){
+      if(bufferGlobal.trim().length >= 6){ var v = bufferGlobal; bufferGlobal=''; procesar(v); }
+      else bufferGlobal = '';
+      enfocar();
+    }, 220);
+  }
+}, true);
+
+// Pantalla siempre encendida y, al primer toque, pantalla completa.
+var bloqueoPantalla = null;
+function mantenerEncendida(){
+  try{
+    if('wakeLock' in navigator && !bloqueoPantalla){
+      navigator.wakeLock.request('screen').then(function(l){
+        bloqueoPantalla = l;
+        l.addEventListener('release', function(){ bloqueoPantalla = null; });
+      }).catch(function(){});
+    }
+  }catch(e){}
+}
+mantenerEncendida();
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) mantenerEncendida(); });
+document.addEventListener('click', function primerToque(){
+  try{
+    var el = document.documentElement;
+    if(!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(function(){});
+  }catch(e){}
+  mantenerEncendida();
+}, {once:true});
+
+function procesar(codigo){
+  codigo = String(codigo||'').trim();
+  if(!codigo) return;
+  if(!total){ mostrar('carga'); return; }
+  var p = buscar(codigo);
+  if(p) mostrarProducto(p); else mostrarNoHay(codigo);
+}
+
+campo.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    var v = campo.value;
+    campo.value = '';
+    procesar(v);
+  }
+});
+
+// Algunos lectores no mandan Enter: si dejó de escribir, resolvemos solos.
+var pausa = null;
+campo.addEventListener('input', function(){
+  if(pausa) clearTimeout(pausa);
+  pausa = setTimeout(function(){
+    if(campo.value.trim().length >= 6){
+      var v = campo.value; campo.value = '';
+      procesar(v);
+    }
+  }, 220);
+});
+
+campo.addEventListener('blur', function(){ setTimeout(enfocar, 60); });
+document.addEventListener('click', function(e){
+  if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') enfocar();
+});
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) enfocar();
+});
+
+// Un toque en la ficha vuelve enseguida a la pantalla de espera.
+$('ficha').addEventListener('click', volverAEsperar);
+$('nohay').addEventListener('click', volverAEsperar);
+
+/* ============ ingreso manual ============ */
+$('btn-manual').addEventListener('click', function(){
+  dialogoAbierto = true;
+  var v = window.prompt('Código de barras del producto');
+  dialogoAbierto = false;
+  if(v) procesar(v);
+  enfocar();
+});
+
+/* ============ carga desde archivo ============ */
+$('btn-archivo').addEventListener('click', function(){ $('file').click(); });
+
+$('file').addEventListener('change', function(){
+  var f = this.files && this.files[0];
+  if(!f) return;
+  var lector = new FileReader();
+  lector.onload = function(){
+    var r = cargarTexto(String(lector.result), f.name);
+    if(r.error){ $('c-detalle').textContent = r.error; return; }
+    guardarCopia(String(lector.result));   // queda guardada en el equipo aunque no haya internet
+    actualizarEstado();
+    volverAEsperar();
+  };
+  lector.readAsText(f, 'windows-1252');
+});
+
+/* ============ datos de prueba ============ */
+var DEMO = [
+ ['7500435230018','AC PANTENE EQ 400ML','10550','0042','LIMPIEZA/CUIDADO PERSONAL'],
+ ['7790272001005','ACEITE NATURA GIRASOL 900 ML','5100','0104','ACEITE'],
+ ['7790670052593','ACELGA GREEN LIFE','5250','0158','COCINA/ENLATADOS'],
+ ['7791337009400','ACTIVIA SACHET CIRUELA DESLAC','7850','0354','LA SERENISIMA'],
+ ['7799155000197','AGUA VILLAVICENCIO 2','3400','0467','BEBIDAS/LICORES'],
+ ['7790220000760','AZUCAR FRONTERITA X 1KG','2100','1283','AZUCAR'],
+ ['8000500009673','BOMBON FERRERO ROCHER 300G','35050','1702','CHOCOLATE'],
+ ['7791337007260','CHOCOLATADA CINDOR','1600','2759','LA SERENISIMA'],
+ ['7794990878581','DULCE DE LECHE LA PAULINA 400','3600','4058','LA PAULINA'],
+ ['070330913431','ENCENDEDOR BIC CHICO','1650','4206','LIMPIEZA/CUIDADO PERSONAL'],
+ ['7790670050728','HAMBURGUESA PATTY FINITAS','2900','5751','HAMBURGUESAS'],
+ ['7797237000097','HARINA FLORENCIA 0000 X 5KG','6950','5789','HARINA'],
+ ['7790036000343','JUGO BAGGIO 1L DURAZNO','2450','6512','JUGO'],
+ ['7793913012996','LECHE UAT DESCREMADA 1LT','2300','7245','TREGAR'],
+ ['7795293104100','ÑOQUIS DON YEYO 500 G','2800','8407','DON YEYO'],
+ ['7896004009155','PRINGLES ORIGINAL 104','7100','9590','SNACKS'],
+ ['7790398100132','QUESO RALLADO LA PAULINA 150','5650','9813','LA PAULINA'],
+ ['7791913000753','SODA SALDAN SIFON','2000','10879','BEBIDAS/LICORES'],
+ ['A1','AZUFRE CAJA X5','2600','1308','LIMPIEZA/CUIDADO PERSONAL'],
+ ['MC','MANTECA CACAO','1250','7823','LIMPIEZA/CUIDADO PERSONAL']
+];
+
+$('btn-demo').addEventListener('click', function(){
+  var nuevo = Object.create(null), n = 0;
+  for(var i=0;i<DEMO.length;i++){
+    var d = DEMO[i];
+    var p = {ean:d[0], nombre:d[1], precio:parseFloat(d[2]), cod:d[3], rubro:d[4]};
+    var cl = clavesDe(d[0]);
+    for(var k=0;k<cl.length;k++){ if(!nuevo[cl[k]]) nuevo[cl[k]] = p; }
+    n++;
+  }
+  indice = nuevo; total = n; origen = 'datos de prueba';
+  actualizarEstado();
+  volverAEsperar();
+});
+
+/* ============ arranque ============ */
+// Se guarda una copia de la última lista buena en el equipo: si al encender
+// todavía no hay internet, el kiosco arranca igual con esa copia.
+var CLAVE_COPIA = 'kiosco_precios_copia';
+
+function guardarCopia(texto){
+  try{ localStorage.setItem(CLAVE_COPIA, JSON.stringify({texto:texto, fecha:Date.now()})); }catch(e){}
+}
+
+function usarCopia(){
+  try{
+    var c = JSON.parse(localStorage.getItem(CLAVE_COPIA) || 'null');
+    if(!c || !c.texto) return false;
+    var f = new Date(c.fecha);
+    var r = cargarTexto(c.texto, 'copia guardada del ' + f.toLocaleDateString('es-AR'));
+    return !!r.ok;
+  }catch(e){ return false; }
+}
+
+function descargarLista(){
+  return fetch('precios.csv', {cache:'no-store'})
+    .then(function(r){
+      if(!r.ok) throw new Error('sin archivo');
+      return r.arrayBuffer();
+    })
+    .then(function(buf){
+      // Flexxus exporta en Windows-1252; si falla, probamos UTF-8.
+      var texto;
+      try { texto = new TextDecoder('windows-1252').decode(buf); }
+      catch(e){ texto = new TextDecoder('utf-8').decode(buf); }
+      var r = cargarTexto(texto, 'precios.csv');
+      if(r.error) throw new Error(r.error);
+      guardarCopia(texto);
+      return true;
+    });
+}
+
+var reintento = null;
+function iniciar(){
+  enfocar();
+  // 1) Arranca al instante con la copia guardada, si hay.
+  var conCopia = usarCopia();
+  actualizarEstado();
+  mostrar(conCopia ? 'espera' : 'carga');
+  if(!conCopia) $('c-detalle').textContent = 'Buscando la lista de precios… (se reintenta sola cada 15 segundos)';
+
+  // 2) Busca la lista actualizada; si no hay conexión, reintenta sola.
+  function intentar(){
+    descargarLista()
+      .then(function(){
+        if(reintento){ clearInterval(reintento); reintento = null; }
+        actualizarEstado();
+        if($('carga').classList.contains('activa')) mostrar('espera');
+        enfocar();
+      })
+      .catch(function(){
+        if(!reintento) reintento = setInterval(intentar, 15000);
+      });
+  }
+  intentar();
+}
+
+// Refresca la lista cada 30 minutos sin interrumpir una consulta en pantalla.
+setInterval(function(){
+  descargarLista().then(actualizarEstado).catch(function(){});
+}, 30*60*1000);
+
+actualizarEstado();
+iniciar();
+
+})();
+</script>
+</body>
+</html>
