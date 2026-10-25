@@ -88,6 +88,7 @@ body{
 #ficha .b-cont{background:#0F7A33;color:#fff;box-shadow:0 6px 0 #0A5524}
 #ficha .b-cont .et{color:#FFE14D}
 #ficha .b-cont .val{font-size:clamp(56px,10.5vw,124px)}
+#ficha .b-cont.cig{background:#3A3A3A;box-shadow:0 6px 0 #1E1E1E}
 #ficha .b-cont.verd{background:#E8590C;box-shadow:0 6px 0 #A63F08}
 .promo{margin-top:30px;display:inline-block;border-radius:18px;overflow:hidden;box-shadow:0 6px 0 rgba(0,0,0,.18)}
 .promo .t{background:#C4161C;color:#fff;font-family:'Archivo Narrow';font-weight:700;font-size:clamp(24px,4vw,40px);letter-spacing:.06em;padding:8px 30px}
@@ -168,14 +169,14 @@ body{
       <div class="glifo" id="glifo"></div>
       <div class="invita">Pasá el producto<br>por el lector</div>
       <div class="sub">El precio aparece en pantalla</div>
-      <div class="promo"><div class="t">SUPERCORDOBÉS<small>DESCUENTOS PAGANDO EN EFECTIVO</small></div><div class="fila"><div class="c c1">Mercadería<b>-5%</b></div><div class="c c2">Verduras<b>-20%</b></div></div></div>
+      <div class="promo"><div class="t">SUPERCORDOBÉS<small>DESCUENTOS PAGANDO EN EFECTIVO</small></div><div class="fila"><div class="c c1">Mercadería<b>-5%</b></div><div class="c c2">Verduras<b>-20%</b></div></div><div style="background:#3A3A3A;color:#fff;font-weight:700;font-size:clamp(14px,2vw,20px);padding:6px 20px">Cigarrillos: sin descuento · otros medios de pago +10%</div></div>
     </div>
 
     <div class="vista" id="ficha">
       <div class="nombre" id="f-nombre"></div>
       <div class="rubro" id="f-rubro"></div>
       <div class="bloques">
-        <div class="bloque b-lista"><div class="et">PRECIO DE LISTA</div><div class="val" id="f-precio"></div></div>
+        <div class="bloque b-lista"><div class="et" id="f-etl">PRECIO DE LISTA</div><div class="val" id="f-precio"></div></div>
         <div class="bloque b-cont" id="f-bcont"><div class="et" id="f-etc"></div><div class="val" id="f-contado"></div></div>
       </div>
       <div class="pie">
@@ -441,10 +442,19 @@ function mostrarProducto(p){
   $('f-rubro').textContent  = p.rubro || '';
   $('f-precio').innerHTML   = '<span>$</span>' + comoPesos(p.precio);
   var verd = /FRUTAS Y VERDURAS/i.test(p.rubro||'');
-  var pct = verd ? 0.20 : 0.05;
-  $('f-etc').textContent = 'CONTADO EFECTIVO -' + (verd?'20':'5') + '%';
-  $('f-contado').innerHTML = '<span>$</span>' + comoPesos(Math.round(p.precio*(1-pct)));
-  $('f-bcont').className = 'bloque b-cont' + (verd?' verd':'');
+  var cig = /CIGARRILLO|TABACO/i.test(p.rubro||'');
+  if(cig){
+    $('f-etl').textContent = 'PRECIO EFECTIVO';
+    $('f-etc').textContent = 'OTROS MEDIOS DE PAGO +10%';
+    $('f-contado').innerHTML = '<span>$</span>' + comoPesos(Math.round(p.precio*1.10));
+    $('f-bcont').className = 'bloque b-cont cig';
+  } else {
+    var pct = verd ? 0.20 : 0.05;
+    $('f-etl').textContent = 'PRECIO DE LISTA';
+    $('f-etc').textContent = 'CONTADO EFECTIVO -' + (verd?'20':'5') + '%';
+    $('f-contado').innerHTML = '<span>$</span>' + comoPesos(Math.round(p.precio*(1-pct)));
+    $('f-bcont').className = 'bloque b-cont' + (verd?' verd':'');
+  }
   $('f-bcont').style.display = p.precio ? '' : 'none';
   $('f-cod').textContent    = p.cod ? 'Código '+p.cod : '';
   $('f-ean').textContent    = p.ean;
