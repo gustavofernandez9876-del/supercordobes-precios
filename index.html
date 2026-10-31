@@ -553,6 +553,20 @@ function procesar(codigo){
   codigo = String(codigo||'').trim();
   if(!codigo) return;
   if(!total){ mostrar('carga'); return; }
+  // Etiqueta de balanza Cuora Neo: EAN13 = 20 + PLU(5) + importe(5) + DV
+  var m = /^20(\d{5})(\d{5})\d$/.exec(codigo);
+  if(m){
+    var pb = buscar('PLU' + parseInt(m[1],10));
+    if(pb){
+      var imp = parseInt(m[2],10);
+      mostrarProducto({ean:codigo, nombre:pb.nombre, rubro:pb.rubro, cod:pb.cod,
+        precio: imp || pb.precio});
+      var kg = (imp && pb.precio) ? (imp/pb.precio) : 0;
+      $('f-cod').textContent = 'PLU ' + parseInt(m[1],10) + ' · $' + comoPesos(pb.precio) + ' por kg o unidad' +
+        (kg ? ' · ' + 'cantidad ' + kg.toFixed(3).replace('.',',') : '');
+      return;
+    }
+  }
   var p = buscar(codigo);
   if(p) mostrarProducto(p); else mostrarNoHay(codigo);
 }
