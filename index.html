@@ -562,7 +562,7 @@ function procesar(codigo){
       mostrarProducto({ean:codigo, nombre:pb.nombre, rubro:pb.rubro, cod:pb.cod,
         precio: imp || pb.precio});
       var kg = (imp && pb.precio) ? (imp/pb.precio) : 0;
-      $('f-cod').textContent = 'PLU ' + parseInt(m[1],10) + ' · $' + comoPesos(pb.precio) + ' por kg o unidad' +
+      $('f-cod').textContent = 'Cód. ' + parseInt(m[1],10) + ' · $' + comoPesos(pb.precio) + ' por kg o unidad' +
         (kg ? ' · ' + 'cantidad ' + kg.toFixed(3).replace('.',',') : '');
       return;
     }
