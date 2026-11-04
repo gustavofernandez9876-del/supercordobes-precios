@@ -992,8 +992,20 @@ $("scan").addEventListener("input", sugerir);
 $("scan").addEventListener("keydown", e=>{
   const bs=[...$("sugg").querySelectorAll("button")];
   if (!$("sugg").hidden && (e.key==="ArrowDown"||e.key==="ArrowUp")){ e.preventDefault(); selS=(selS+(e.key==="ArrowDown"?1:-1)+bs.length)%bs.length; bs.forEach((b,i)=>b.classList.toggle("on",i===selS)); return; }
-  if (e.key==="Enter"){ e.preventDefault(); if (selS>=0 && bs[selS]) return elegir(bs[selS].dataset.cod); if (agregar($("scan").value)){ $("scan").value=""; $("sugg").hidden=true; } }
+  if (e.key==="Enter"){ e.preventDefault(); clearTimeout(autoT); if (!$("scan").value.trim()) return; if (selS>=0 && bs[selS]) return elegir(bs[selS].dataset.cod); if (agregar($("scan").value)){ $("scan").value=""; $("sugg").hidden=true; } }
   if (e.key==="Escape") $("sugg").hidden=true;
+});
+// Lector: si entra un código de barras completo que existe, se agrega solo (sin Enter)
+let autoT=null;
+$("scan").addEventListener("input", ()=>{
+  clearTimeout(autoT);
+  const v=$("scan").value.trim();
+  if (!/^\d{8,14}$/.test(v)) return;
+  autoT=setTimeout(()=>{
+    const w=$("scan").value.trim(); if (w!==v) return;
+    const ok = porBarra.get(w) || porLector(w).filter(x=>!x.inactivo).length===1 || (typeof leerEtiqueta==="function" && leerEtiqueta(w));
+    if (ok && agregar(w)){ $("scan").value=""; $("sugg").hidden=true; }
+  },120);
 });
 $("sugg").addEventListener("click", e=>{ const b=e.target.closest("button"); if (b) elegir(b.dataset.cod); });
 $("btnAdd").addEventListener("click", ()=>{ if (agregar($("scan").value)) $("scan").value=""; $("scan").focus(); });
