@@ -96,6 +96,7 @@ td.r,th.r{text-align:right}
 .adj input[type=text]{flex:1}
 .cobrar{width:100%;font-size:22px;padding:14px;font-family:var(--display);font-weight:700;letter-spacing:.04em}
 .cobrar:disabled{opacity:.45;cursor:not-allowed}
+#btnCobrar{position:sticky;bottom:10px;z-index:30;box-shadow:0 -6px 18px rgba(0,0,0,.18)}
 .vuelto{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px}
 .vuelto input{width:120px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--bg)}
 
@@ -663,7 +664,7 @@ fetch("productos.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(ro
   catalogoReal=true; aplicarEditsProd(); indexar();
   carrito=[]; ultimo=null;
   ["6*7790742625502","7793704000928","1.25*11408"].forEach(c=>agregar(c));
-  render(); $("catInfo").textContent="Catálogo real: "+PRODUCTOS.length.toLocaleString("es-AR")+" productos (precios Flexxus 16/10/2026 + facturas y listas al 17/10/2026)";
+  render(); $("catInfo").textContent="Catálogo real: "+PRODUCTOS.length.toLocaleString("es-AR")+" productos (precios actualizados al 04/11/2026)";
 }).catch(()=>{ $("catInfo").textContent="Sin catálogo real: usando productos de ejemplo"; });
 // ===== Etiquetas de la balanza Cuora Neo =====
 // EAN-13: [prefijo fijo] + [código del producto] + [precio o peso] + dígito verificador.
