@@ -96,7 +96,9 @@ td.r,th.r{text-align:right}
 .adj input[type=text]{flex:1}
 .cobrar{width:100%;font-size:22px;padding:14px;font-family:var(--display);font-weight:700;letter-spacing:.04em}
 .cobrar:disabled{opacity:.45;cursor:not-allowed}
-#btnCobrar{position:sticky;bottom:10px;z-index:30;box-shadow:0 -6px 18px rgba(0,0,0,.18)}
+.cobrarBox{position:sticky;bottom:10px;z-index:30;background:var(--bg,#fff);border-radius:10px;padding:8px;box-shadow:0 -6px 18px rgba(0,0,0,.18)}
+.impChk{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:700;margin:0 0 8px;cursor:pointer}
+.impChk input{width:24px;height:24px}
 .vuelto{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px}
 .vuelto input{width:120px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--bg)}
 
@@ -296,7 +298,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
       </div>
     </div>
 
-    <button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button>
+    <div class="cobrarBox"><label class="impChk"><input type="checkbox" id="chkImp"> Imprimir ticket</label><button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button></div>
     <button class="btn" id="btnCancel" type="button">Cancelar venta</button>
 
     <div class="panel">
@@ -961,8 +963,25 @@ function cobrar(){
      <div class="tl"><span>${v.pago}</span><span>${v.comp}</span></div>${(v.pagos||[]).map(x=>`<div class="tl num" style="font-size:13px"><span>  ${x.medio}</span><span>${fmt(x.monto)}</span></div>`).join("")}${v.clienteFA?`<hr><div class="tl"><span>Cliente</span><b>${v.clienteFA.razon}</b></div><div class="tl num"><span>${v.clienteFA.cuit?"CUIT":"DNI"}</span><span>${v.clienteFA.cuit?fmtCuit(v.clienteFA.cuit):(v.clienteFA.doc||"—")}</span></div><div class="tl"><span>Condición IVA</span><span>${v.clienteFA.cond}</span></div><div class="tl"><span>Domicilio</span><span>${v.clienteFA.dom||"—"}</span></div><hr>`:""}${v.cliente?`<div class="tl"><span>A cuenta de</span><span>${v.cliente}</span></div><div class="tl num"><span>Saldo de la cuenta</span><span>${fmt(cliCC.saldo)}</span></div><div class="tl"><span>Vence</span><span>${new Date(new Date(cliCC.desde+"T12:00").getTime()+(PLAZO_CC-1)*86400000).toLocaleDateString("es-AR")}</span></div>`:""}${v.ajusteMotivo?`<div class="tl"><span>Motivo ajuste</span><span>${v.ajusteMotivo}</span></div>`:""}
      <div style="font-size:12px;color:var(--muted);margin-top:8px">${v.comp==="Remito interno"?"Queda registrado en el sistema y descuenta stock. No va a ARCA.":"En el sistema final, acá se pide el CAE a ARCA y se envía por WhatsApp o correo."}</div>
      <button class="btn primary" id="btnNueva" type="button" style="width:100%;margin-top:14px">Nueva venta</button>`;
-  $("modal").hidden = false; $("btnNueva").focus();
+  if ($("chkImp").checked) imprimirTicket(v);
+  nueva(); aviso("Venta #"+v.nro+" cobrada: "+fmt(v.total)+($("chkImp").checked?" · imprimiendo ticket":""));
 }
+function imprimirTicket(v){
+  const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const h=`<html><head><meta charset="utf-8"><style>@page{size:58mm auto;margin:2mm}body{font-family:monospace;font-size:11px;width:54mm;margin:0}
+  .c{text-align:center}.r{display:flex;justify-content:space-between;gap:4px}.t{font-size:15px;font-weight:bold}hr{border:0;border-top:1px dashed #000}</style></head><body>
+  <div class="c t">SUPERCORDOBES</div><div class="c">General Paz 370 - Gral. Levalle</div><hr>
+  <div>Venta #${v.nro} - ${v.fecha} ${v.hora}</div><div>${esc(v.caja)} - ${esc(v.cajero)}</div><hr>
+  ${v.items.map(i=>`<div>${esc(i.q)} ${esc(i.desc)}</div><div class="r"><span></span><span>${fmt(i.importe)}</span></div>`).join("")}
+  <hr><div class="r t"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
+  <div class="r"><span>${esc(v.pago)}</span><span>${esc(v.comp)}</span></div><hr><div class="c">Gracias por su compra</div><div class="c">No valido como factura</div></body></html>`;
+  let f=document.getElementById("printFrame"); if(f) f.remove();
+  f=document.createElement("iframe"); f.id="printFrame"; f.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0";
+  document.body.appendChild(f); f.contentDocument.open(); f.contentDocument.write(h); f.contentDocument.close();
+  setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ aviso("No se pudo imprimir"); } },150);
+}
+try{ $("chkImp").checked = localStorage.getItem("cajaImp")==="1"; }catch(e){}
+$("chkImp").addEventListener("change",()=>{ try{ localStorage.setItem("cajaImp",$("chkImp").checked?"1":"0"); }catch(e){} });
 function nueva(){ carrito=[]; ultimo=null; $("adjPct").value=0; $("adjMot").value=""; $("paga").value=""; pago="Efectivo"; comp="Factura B"; ccSel=""; faCli=null; $("faBus").value=""; $("modal").hidden=true; render(); $("scan").focus(); }
 
 let tt; function aviso(m){ const el=$("toast"); el.textContent=m; el.hidden=false; clearTimeout(tt); tt=setTimeout(()=>el.hidden=true,2600); }
