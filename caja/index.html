@@ -665,7 +665,7 @@ function stockDe(p){ if(!p||STOCK.s[p.cod]==null) return null; let n=+STOCK.s[p.
   return Math.round(n*100)/100; }
 function stockTxt(p){ const n=stockDe(p); return n==null?'<span style="color:var(--muted)">sin dato</span>':`<b style="color:${n<=0?'var(--off)':'var(--accent)'}">${n.toLocaleString('es-AR')}</b>`; }
 fetch("productos.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(rows=>{
-  PRODUCTOS = rows.map(([cod,bc,desc,rubro,marca,precio,fl,empresa])=>({cod,bc,plu:"",desc,rubro,marca,empresa:empresa||"",precio,efe:!fl.includes("n"),fv:fl.includes("f"),cig:/CIGARR|TABACO/i.test(rubro||"")}));
+  PRODUCTOS = rows.map(([cod,bc,desc,rubro,marca,precio,fl,empresa,iva])=>({cod,bc,plu:"",desc,rubro,marca,empresa:empresa||"",precio,iva:(iva===""||iva==null)?null:+iva,efe:!fl.includes("n"),fv:fl.includes("f"),cig:/CIGARR|TABACO/i.test(rubro||"")}));
   catalogoReal=true; aplicarEditsProd(); indexar();
   carrito=[]; ultimo=null;
   ["6*7790742625502","7793704000928","1.25*11408"].forEach(c=>agregar(c));
@@ -1674,7 +1674,7 @@ pintarNube();
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0">Punto de venta <select id="arcaPV"><option value="8">8 · Caja 1</option><option value="12">12 · Caja 2</option><option value="13">13 · Notebook</option></select></label>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0"><button class="btn" id="arcaProbar" type="button">Probar conexión</button><button class="btn" id="arcaReint" type="button">Reintentar pendientes</button></div>
     <div id="arcaEst" class="hint"></div>
-    <div class="hint" style="margin-top:8px">IVA usado mientras no esté cargado el de Flexxus: frutas y verduras 10,5%, el resto 21%.</div>
+    <div class="hint" style="margin-top:8px">IVA por producto: 10,5% frutas, verduras, carnes, harina de trigo y legumbres secas; 21% el resto (arroz incluido).</div>
   </div>
 </div>
 <script>
