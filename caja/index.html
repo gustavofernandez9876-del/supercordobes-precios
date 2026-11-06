@@ -204,6 +204,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnCtas" type="button">Cuentas corrientes</button>
     <button class="btn" id="btnBal" type="button">Etiquetas balanza</button>
     <button class="btn" id="btnNC" type="button">Nota de crédito</button>
+    <button class="btn" id="btnFalt" type="button">Productos faltantes</button>
     <button class="btn" id="btnCierre" type="button">Cerrar caja</button>
     <button class="btn" id="btnFull" type="button">Pantalla completa</button>
     <button class="btn primary" id="btnCliente" type="button">Pantalla cliente</button>
@@ -219,6 +220,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
 
 <div class="grid vista" id="vCaja">
   <section class="panel">
+    <div id="salas" role="tablist" aria-label="Ventas abiertas" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <label class="label" for="scan">Código, nombre o PLU de balanza</label>
     <div class="scan">
       <input id="scan" autocomplete="off" placeholder="Escaneá el código o escribí una palabra (ej. leche)">
@@ -1583,6 +1585,83 @@ pintarNube();
   g("balDef").addEventListener("click",()=>{ Object.assign(BAL,BAL_DEF); pintar(); });
   g("balCerrar").addEventListener("click",()=>{ leer(); guardarBal(); m.hidden=true; m.style.display="none"; });
   m.style.display="none";
+})();
+</script>
+
+<div class="modal" id="faltModal" hidden>
+  <div class="ticket ci" role="dialog" aria-labelledby="faltTit" style="max-width:640px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <h3 id="faltTit">Productos faltantes</h3>
+      <button class="del" id="faltCerrar" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <p style="margin:4px 0 10px;color:var(--muted)">Anotá lo que falta en góndola, lo que pidió un cliente o lo que nos sugirieron traer.</p>
+    <div style="display:grid;grid-template-columns:1fr;gap:6px">
+      <input id="faltProd" type="text" placeholder="Producto (ej. Yerba Playadito 1 kg)" style="border:1px solid var(--line);border-radius:6px;padding:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <select id="faltTipo" style="border:1px solid var(--line);border-radius:6px;padding:6px"><option>Falta en góndola</option><option>Lo pidió un cliente</option><option>Sugerencia</option></select>
+        <input id="faltNota" type="text" placeholder="Nota: quién lo pidió, cantidad, marca…" style="flex:1;min-width:180px;border:1px solid var(--line);border-radius:6px;padding:6px">
+        <button class="btn primary" id="faltAdd" type="button">Anotar</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin:12px 0 6px;flex-wrap:wrap" id="faltFiltros">
+      <button type="button" class="chip" data-ff="pend" aria-pressed="true">Pendientes</button>
+      <button type="button" class="chip" data-ff="hecho" aria-pressed="false">Ya resueltos</button>
+    </div>
+    <div id="faltList"></div>
+    <div class="hint" id="faltEst" style="margin-top:8px"></div>
+  </div>
+</div>
+<script>
+// ===== Varias ventas abiertas a la vez =====
+(function(){
+  const N=2; let act=0; const salas=new Array(N).fill(null);
+  const foto=()=>({carrito, ultimo, pago, comp, ccSel, faCli, adjTipo:$("adjTipo").value, adjPct:$("adjPct").value, adjMot:$("adjMot").value, paga:$("paga").value, spOn:$("spOn").checked, spM1:$("spM1").value, spMed2:$("spMed2").value, faBus:$("faBus").value});
+  function cargar(f){
+    if(!f){ carrito=[]; ultimo=null; pago="Efectivo"; comp="Factura B"; ccSel=""; faCli=null; $("adjTipo").value="-1"; $("adjPct").value=0; $("adjMot").value=""; $("paga").value=""; $("spOn").checked=false; $("spM1").value=""; $("faBus").value=""; return; }
+    carrito=f.carrito; ultimo=f.ultimo; pago=f.pago; comp=f.comp; ccSel=f.ccSel; faCli=f.faCli; $("adjTipo").value=f.adjTipo; $("adjPct").value=f.adjPct; $("adjMot").value=f.adjMot; $("paga").value=f.paga; $("spOn").checked=f.spOn; $("spM1").value=f.spM1; $("spMed2").value=f.spMed2; $("faBus").value=f.faBus||"";
+  }
+  function resumen(i){ const f = i===act ? foto() : salas[i]; if(!f||!f.carrito.length) return "vacía";
+    const n=f.carrito.length; const nom=f.faCli?f.faCli.razon:""; return `${f.comp} · ${n} prod.${nom?" · "+nom:""}`; }
+  function pintar(){ const el=$("salas"); if(!el) return;
+    el.innerHTML=salas.map((_,i)=>`<button type="button" class="chip" role="tab" data-sala="${i}" aria-pressed="${i===act}" aria-selected="${i===act}" style="${i===act?"":"opacity:.85"}"><b>Venta ${i+1}</b> <small>${escH(resumen(i))}</small></button>`).join("")
+      + `<span class="hint" style="align-self:center">Si el cliente se aparta, pasá a la otra venta y atendé al siguiente; la primera queda guardada.</span>`; }
+  window.__pintarSalas=pintar;
+  $("salas").addEventListener("click",e=>{ const b=e.target.closest("[data-sala]"); if(!b) return; const i=+b.dataset.sala; if(i===act) return;
+    salas[act]=foto(); act=i; cargar(salas[i]); salas[i]=null; $("modal").hidden=true; render(); $("scan").focus(); aviso("Atendiendo Venta "+(i+1)); });
+  const r0=render; render=function(...a){ const x=r0.apply(this,a); try{ pintar(); }catch(e){} return x; };
+  pintar();
+})();
+// ===== Productos faltantes (compartido entre cajas por la nube) =====
+(function(){
+  let FALT=lsGet("cajaFalt",[]), filtro="pend";
+  const guardarL=()=>lsSet("cajaFalt",FALT);
+  function pintar(){ const l=FALT.filter(x=>filtro==="pend"?!x.hecho:x.hecho).sort((a,b)=>b.ts-a.ts);
+    $("faltList").innerHTML = l.length ? l.map(x=>`<div style="display:flex;gap:8px;align-items:flex-start;border-bottom:1px solid var(--line);padding:8px 0">
+      <div style="flex:1"><b>${escH(x.prod)}</b> <small style="color:var(--muted)">· ${escH(x.tipo)}</small>${x.nota?`<br><small>${escH(x.nota)}</small>`:""}<br><small style="color:var(--muted)">${new Date(x.ts).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})} · ${escH(x.quien||"")} · ${escH(x.caja||"")}</small></div>
+      <button class="btn" type="button" data-fh="${x.id}">${x.hecho?"Volver a pendiente":"Resuelto ✓"}</button>
+      ${x.hecho?`<button class="del" type="button" data-fd="${x.id}" aria-label="Borrar">×</button>`:""}</div>`).join("")
+      : `<div class="hint">${filtro==="pend"?"No hay faltantes anotados.":"Nada resuelto todavía."}</div>`;
+    const n=FALT.filter(x=>!x.hecho).length; $("btnFalt").textContent="Productos faltantes"+(n?` (${n})`:"");
+    $("faltEst").textContent = (typeof NUBE!=="undefined"&&NUBE) ? "Se comparte con todas las cajas y con tu teléfono." : "Sin nube: queda guardado solo en esta computadora."; }
+  function subirF(x){ try{ if(typeof NUBE!=="undefined"&&NUBE) NUBE.doc("faltantes/"+x.id).set(JSON.parse(JSON.stringify(x))).catch(()=>{}); }catch(e){} }
+  function borrarF(id){ try{ if(typeof NUBE!=="undefined"&&NUBE) NUBE.doc("faltantes/"+id).delete().catch(()=>{}); }catch(e){} }
+  $("btnFalt").addEventListener("click",()=>{ pintar(); $("faltModal").hidden=false; $("faltProd").focus(); });
+  $("faltCerrar").addEventListener("click",()=>{ $("faltModal").hidden=true; $("scan").focus(); });
+  function anotar(){ const prod=$("faltProd").value.trim(); if(!prod){ $("faltProd").focus(); return; }
+    const x={id:"f"+Date.now()+Math.random().toString(36).slice(2,5), prod, tipo:$("faltTipo").value, nota:$("faltNota").value.trim(), quien:$("cajero").value, caja:$("caja").value, ts:Date.now(), hecho:false};
+    FALT.push(x); guardarL(); subirF(x); $("faltProd").value=""; $("faltNota").value=""; pintar(); aviso("Anotado: "+prod); $("faltProd").focus(); }
+  $("faltAdd").addEventListener("click",anotar);
+  ["faltProd","faltNota"].forEach(id=>$(id).addEventListener("keydown",e=>{ if(e.key==="Enter") anotar(); }));
+  $("faltFiltros").addEventListener("click",e=>{ const b=e.target.closest("[data-ff]"); if(!b) return; filtro=b.dataset.ff; [...$("faltFiltros").children].forEach(c=>c.setAttribute("aria-pressed",c===b)); pintar(); });
+  $("faltList").addEventListener("click",e=>{ const h=e.target.closest("[data-fh]"), d=e.target.closest("[data-fd]");
+    if(h){ const x=FALT.find(y=>y.id===h.dataset.fh); if(x){ x.hecho=!x.hecho; x.ts2=Date.now(); guardarL(); subirF(x); pintar(); } }
+    if(d && confirm("¿Borrar este faltante resuelto?")){ FALT=FALT.filter(y=>y.id!==d.dataset.fd); guardarL(); borrarF(d.dataset.fd); pintar(); } });
+  window.claude?.use?.("db").then(db=>{ if(!db) return;
+    FALT.forEach(subirF);
+    db.collection("faltantes").onSnapshot(s=>{ const m=new Map(FALT.map(x=>[x.id,x])); s.docs.forEach(d=>{ const x=d.data(); const y=m.get(x.id); if(!y || (x.ts2||0)>(y.ts2||0)) m.set(x.id,x); });
+      const ids=new Set(s.docs.map(d=>d.data().id)); FALT=[...m.values()].filter(x=>ids.has(x.id)||!x.sub); FALT.forEach(x=>x.sub=true); guardarL(); pintar(); }, ()=>{});
+  }).catch(()=>{});
+  pintar();
 })();
 </script>
 </body></html>
