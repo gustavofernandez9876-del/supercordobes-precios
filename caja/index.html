@@ -206,6 +206,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnNC" type="button">Nota de crédito</button>
     <button class="btn" id="btnFalt" type="button">Productos faltantes</button>
     <button class="btn" id="btnCompA" type="button">Compras Factura A</button>
+    <button class="btn" id="btnVenc" type="button">Vencimientos</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
     <button class="btn" id="btnCierre" type="button">Cerrar caja</button>
     <button class="btn" id="btnFull" type="button">Pantalla completa</button>
@@ -488,6 +489,21 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <div id="cpList" class="hist num"></div>
   </div>
 </div>
+<div class="modal" id="vcModal" hidden>
+  <div class="ticket ci" role="dialog" aria-labelledby="vcTit" style="max-width:640px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="vcTit">Vencimientos</h3><button class="del" id="vcX" type="button" aria-label="Cerrar">×</button></div>
+    <div class="hint" style="margin-bottom:6px">Lácteos: aviso 10 días antes. Resto: aviso 15 días antes. Panes Bimbo, Fargo y La Veneciana no se controlan. Dentro de ese plazo el producto pasa solo a OFERTA con 10% menos en la caja.</div>
+    <div class="cigrid">
+      <label for="vcCod">Producto (código o nombre)</label><input id="vcCod" type="text" autocomplete="off" placeholder="Escaneá el código">
+      <span></span><div id="vcProd" style="font-size:13px;font-weight:600"></div>
+      <label for="vcFecha">Vence el</label><input id="vcFecha" type="date">
+      <label for="vcCant">Cantidad (opcional)</label><input id="vcCant" type="number" min="0" step="1">
+      <span></span><button class="btn primary" id="vcGuardar" type="button">Guardar vencimiento</button>
+    </div>
+    <div class="label" style="margin-top:12px">Próximos a vencer</div>
+    <div id="vcList" class="hist num" style="max-height:40vh"></div>
+  </div>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -760,6 +776,7 @@ function agregar(texto){
 }
 
 function render(flash){
+  try{ const vo=vencEnOferta(); carrito.forEach(l=>{ if(l.dto===undefined && vo.has(l.p.cod)){ l.dto=10; l.vto=true; } }); }catch(e){}
   aplicarCombos();
   const tb = $("tbody");
   if (!carrito.length) tb.innerHTML = '<tr><td colspan="6" class="empty">Escaneá el primer producto para empezar la venta.</td></tr>';
@@ -1580,6 +1597,7 @@ function pintarNube(){ const el=$("nubeEst"); if(!el) return; el.textContent = !
 let ccT=+lsGet("cajaCCt",0);
 window.__syncCC=function(){ ccT=Date.now(); lsSet("cajaCCt",ccT); if(NUBE) NUBE.doc("sync/cc").set({json:JSON.stringify(CC), t:ccT, maq:MAQ}).catch(()=>{}); };
 window.claude?.use?.("db").then(d=>{ if(!d) { pintarNube(); return; } NUBE=d; subir();
+  try{ NUBE.doc("sync/venc").onSnapshot(x=>{ const j=x&&x.exists?x.data():null; if(j&&j.json){ VENC=JSON.parse(j.json); lsSet("cajaVenc",VENC); try{render();}catch(e){} } },()=>{}); }catch(e){}
   d.doc("sync/cc").onSnapshot(s=>{ const x=s.exists?s.data():null;
     if(!x){ window.__syncCC(); return; }
     if(x.t>ccT && x.maq!==MAQ){ try{ const nv=JSON.parse(x.json); CC.length=0; nv.forEach(c=>CC.push(c)); localStorage.setItem("cajaCC",JSON.stringify(CC)); ccT=x.t; lsSet("cajaCCt",ccT); render(); }catch(e){} }
@@ -4051,6 +4069,26 @@ $("cpGuardar").addEventListener("click",()=>{
   if(COMPRAS_A.some(x=>x.cuit===c.cuit&&x.nro===c.nro&&x.prov===c.prov)){ aviso("Esa factura ya está cargada."); return; }
   COMPRAS_A.push(c); lsSet("cajaComprasA",COMPRAS_A); aNube("compras",c);
   ["cpProv","cpCuit","cpNro","cpNeto","cpIva","cpTotal"].forEach(id=>$(id).value=""); $("cpOtros").value="0"; cpPintar(); aviso("Factura A de compra guardada."); $("cpProv").focus(); });
+
+// ===== Vencimientos: aviso 10 días antes (lácteos) / 15 días (resto); panes Bimbo, Fargo, La Veneciana excluidos. En plazo => oferta 10% automática =====
+let VENC=lsGet("cajaVenc",[]), vcP=null;
+const esLacteo=p=>/LECHE|L[AÁ]CTEO|YOGU|QUESO|MANTECA|CREMA DE LECHE|POSTRE|FLAN|RICOTA|SERENISIMA|SANCOR|ILOLAY|TREGAR|MILKAUT|VERONICA/i.test((p.rubro||"")+" "+(p.desc||"")+" "+(p.marca||""));
+const esPanExc=p=>/BIMBO|FARGO|VENECIANA/i.test((p.marca||"")+" "+(p.desc||"")+" "+(p.rubro||""));
+const diasA=f=>Math.round((new Date(f+"T12:00")-new Date(diaISO(new Date())+"T12:00"))/86400000);
+function vencPlazo(v){ return v.lacteo?10:15; }
+function vencEnOferta(){ const s=new Set(); VENC.forEach(v=>{ if(v.baja||v.excluido) return; const d=diasA(v.fecha); if(d>=0 && d<=vencPlazo(v)) s.add(v.cod); }); return s; }
+function vencGuardar(){ lsSet("cajaVenc",VENC); try{ if(NUBE) NUBE.doc("sync/venc").set({json:JSON.stringify(VENC),t:Date.now()}).catch(()=>{}); }catch(e){} }
+function vcPintar(){ const l=VENC.filter(v=>!v.baja).slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  $("vcList").innerHTML=l.map((v,i)=>{ const d=diasA(v.fecha), of=!v.excluido&&d>=0&&d<=vencPlazo(v);
+    return `<div><span>${v.fecha.split("-").reverse().join("/")} · ${v.desc}${v.cant?" · "+v.cant+" u.":""}<br><small>${v.excluido?"pan excluido":v.lacteo?"lácteo (10 días)":"15 días"} · ${d<0?"<b style='color:var(--off)'>VENCIDO</b>":d+" días"}${of?" · <b style='color:var(--off)'>OFERTA −10%</b>":""}</small></span><button class="del" type="button" data-vcb="${v.id}" title="Quitar (ya no queda)">×</button></div>`; }).join("")||"<div>Sin vencimientos cargados.</div>"; }
+$("btnVenc").addEventListener("click",()=>{ vcPintar(); $("vcModal").hidden=false; $("vcCod").focus(); });
+$("vcX").addEventListener("click",()=>{ $("vcModal").hidden=true; $("scan").focus(); });
+$("vcCod").addEventListener("keydown",e=>{ if(e.key!=="Enter") return; e.preventDefault(); const t=$("vcCod").value.trim();
+  vcP=porLector(t)[0]||buscar(t)||(buscarTexto(t)||[])[0]||null; $("vcProd").textContent=vcP?vcP.desc+" · "+fmt(vcP.precio):"No encontrado"; if(vcP) $("vcFecha").focus(); });
+$("vcGuardar").addEventListener("click",()=>{ if(!vcP){ aviso("Escaneá el producto y apretá Enter."); return; } const f=$("vcFecha").value; if(!f){ aviso("Falta la fecha de vencimiento."); return; }
+  const v={id:"v"+Date.now(),cod:vcP.cod,desc:vcP.desc,marca:vcP.marca||"",rubro:vcP.rubro||"",precio:vcP.precio,fecha:f,cant:+$("vcCant").value||0,lacteo:esLacteo(vcP),excluido:esPanExc(vcP),cargo:$("cajero").value.trim(),alta:diaISO(new Date())};
+  VENC.push(v); vencGuardar(); vcP=null; ["vcCod","vcFecha","vcCant"].forEach(id=>$(id).value=""); $("vcProd").textContent=""; vcPintar(); render(); aviso(v.excluido?"Guardado (pan excluido de avisos).":"Vencimiento guardado."); $("vcCod").focus(); });
+$("vcList").addEventListener("click",e=>{ const b=e.target.closest("[data-vcb]"); if(!b) return; const v=VENC.find(x=>x.id===b.dataset.vcb); if(v){ v.baja=diaISO(new Date()); vencGuardar(); vcPintar(); render(); } });
 // ===== Factura electrónica ARCA (servicio local en 127.0.0.1:8765) =====
 const ARCA_URL="http://127.0.0.1:8765", ARCA_CUIT="20216950306";
 // Buscar datos del cliente en el padrón de ARCA (servicio local, ws_sr_padron_a13) por CUIT o DNI
