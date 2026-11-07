@@ -205,6 +205,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnBal" type="button">Etiquetas balanza</button>
     <button class="btn" id="btnNC" type="button">Nota de crédito</button>
     <button class="btn" id="btnFalt" type="button">Productos faltantes</button>
+    <button class="btn" id="btnCompA" type="button">Compras Factura A</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
     <button class="btn" id="btnCierre" type="button">Cerrar caja</button>
     <button class="btn" id="btnFull" type="button">Pantalla completa</button>
@@ -466,6 +467,25 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
       <p style="margin:6px 0 10px">Este dispositivo es tuyo: no pide clave para productos, descuentos ni notas de crédito.</p>
       <button class="btn" id="dispQuitar" type="button">Dejar de confiar en este dispositivo</button>
     </div>
+  </div>
+</div>
+<div class="modal" id="cpModal" hidden>
+  <div class="ticket ci" role="dialog" aria-labelledby="cpTit" style="max-width:560px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="cpTit">Compras con Factura A</h3><button class="del" id="cpX" type="button" aria-label="Cerrar">×</button></div>
+    <div class="hint" style="margin-bottom:6px">Cargá cada Factura A de proveedor (los remitos no van). Sirve para el aviso diario de IVA compras contra ventas facturadas.</div>
+    <div class="cigrid">
+      <label for="cpFecha">Fecha de la factura</label><input id="cpFecha" type="date">
+      <label for="cpProv">Proveedor</label><input id="cpProv" type="text" placeholder="Ej. DON HIGINIO">
+      <label for="cpCuit">CUIT proveedor</label><input id="cpCuit" type="text" inputmode="numeric">
+      <label for="cpNro">N° factura</label><input id="cpNro" type="text" placeholder="0001-00012345">
+      <label for="cpNeto">Neto gravado</label><input id="cpNeto" type="number" min="0" step="any">
+      <label for="cpIva">IVA (21% + 10,5%)</label><input id="cpIva" type="number" min="0" step="any">
+      <label for="cpOtros">Percepciones / otros</label><input id="cpOtros" type="number" min="0" step="any" value="0">
+      <label for="cpTotal">Total factura</label><input id="cpTotal" type="number" min="0" step="any">
+      <span></span><button class="btn primary" id="cpGuardar" type="button">Guardar factura</button>
+    </div>
+    <div class="label" style="margin-top:12px">Cargadas en esta compu (últimas)</div>
+    <div id="cpList" class="hist num"></div>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -4017,6 +4037,20 @@ var qrcode = function() {
 
 </script>
 <script>
+
+// ===== Compras con Factura A (para el aviso diario compras vs ventas facturadas) =====
+let COMPRAS_A=lsGet("cajaComprasA",[]);
+function cpPintar(){ $("cpList").innerHTML=COMPRAS_A.slice(-15).reverse().map(c=>`<div><span>${c.fecha.split("-").reverse().join("/")} · ${c.prov} · ${c.nro}</span><b>${fmt(c.total)}</b></div>`).join("")||"<div>Sin facturas cargadas.</div>"; }
+$("btnCompA").addEventListener("click",()=>{ if(!$("cpFecha").value) $("cpFecha").value=diaISO(new Date()); cpPintar(); $("cpModal").hidden=false; $("cpProv").focus(); });
+$("cpX").addEventListener("click",()=>{ $("cpModal").hidden=true; });
+["cpNeto","cpIva","cpOtros"].forEach(id=>$(id).addEventListener("input",()=>{ const t=(+$("cpNeto").value||0)+(+$("cpIva").value||0)+(+$("cpOtros").value||0); $("cpTotal").value=Math.round(t*100)/100; }));
+$("cpGuardar").addEventListener("click",()=>{
+  const c={tipo:"Factura A", fecha:$("cpFecha").value, dia:$("cpFecha").value, prov:$("cpProv").value.trim().toUpperCase(), cuit:$("cpCuit").value.replace(/\D/g,""), nro:$("cpNro").value.trim(),
+    neto:+$("cpNeto").value||0, iva:+$("cpIva").value||0, otros:+$("cpOtros").value||0, total:+$("cpTotal").value||0, cargo:$("cajero").value.trim()};
+  if(!c.fecha||!c.prov||!c.nro||!(c.total>0)){ aviso("Completá fecha, proveedor, número y total."); return; }
+  if(COMPRAS_A.some(x=>x.cuit===c.cuit&&x.nro===c.nro&&x.prov===c.prov)){ aviso("Esa factura ya está cargada."); return; }
+  COMPRAS_A.push(c); lsSet("cajaComprasA",COMPRAS_A); aNube("compras",c);
+  ["cpProv","cpCuit","cpNro","cpNeto","cpIva","cpTotal"].forEach(id=>$(id).value=""); $("cpOtros").value="0"; cpPintar(); aviso("Factura A de compra guardada."); $("cpProv").focus(); });
 // ===== Factura electrónica ARCA (servicio local en 127.0.0.1:8765) =====
 const ARCA_URL="http://127.0.0.1:8765", ARCA_CUIT="20216950306";
 // Buscar datos del cliente en el padrón de ARCA (servicio local, ws_sr_padron_a13) por CUIT o DNI
