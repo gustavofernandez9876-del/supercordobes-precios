@@ -714,6 +714,15 @@ function agregar(texto){
   { const tt=t; if (!porBarra.get(tt)) { const e=leerEtiqueta(tt); if (e) return agregarEtiqueta(e); } }
   const m = t.match(/^([\d.,]+)\s*\*\s*(.+)$/);
   if (m){ q = parseFloat(m[1].replace(",", ".")); t = m[2]; }
+  if (t==="250" || /^PRODUCTOS? VARIOS$/i.test(t)){   // Productos varios: precio y detalle a mano
+    const base=porCod.get("250")||{cod:"250",bc:"",plu:"",desc:"PRODUCTOS VARIOS",rubro:"GENERAL",marca:"",empresa:"",precio:0,iva:21,efe:true};
+    const pr=prompt("PRODUCTOS VARIOS (250)\nPrecio por unidad:",""); if(pr===null) return false;
+    const precio=parseFloat(String(pr).replace(/\./g,"").replace(",","."));
+    if(!(precio>0)){ aviso("Precio inválido."); return false; }
+    const det=(prompt("Detalle (opcional, ej. bolsa de residuos):","")||"").trim();
+    const p=Object.assign({},base,{desc:"PRODUCTOS VARIOS"+(det?" - "+det.toUpperCase():""),precio});
+    carrito.push({p,q}); ultimo=p; render(p); $("scan").value=""; return true;
+  }
   // Mismo código de barras en varios productos: no se elige solo, el cajero indica cuál es.
   const fz = t.match(/^#(\d+)$/), forzado = fz ? repetidos[+fz[1]] : null;   // "#n" = el que eligió el cajero en la lista de repetidos
   const vivos = forzado ? [] : porLector(t).filter(x=>!x.inactivo);
