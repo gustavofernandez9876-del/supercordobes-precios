@@ -681,18 +681,28 @@ let BAL=Object.assign({},BAL_DEF); try{ const g=JSON.parse(localStorage.getItem(
 BAL.v=3;
 function guardarBal(){ try{ localStorage.setItem("cajaBal",JSON.stringify(BAL)); }catch(e){} }
 function leerEtiqueta(t){
-  const pre=String(BAL.prefijos).split(/[,\s]+/).filter(Boolean), dC=+BAL.dCod, dV=+BAL.dVal;
-  if (!/^\d+$/.test(t)) return null;
-  const pf=pre.find(x=>t.startsWith(x)); if(!pf) return null;
-  if (t.length!==pf.length+dC+dV+1) return null;
-  const cod=t.substr(pf.length,dC), val=+t.substr(pf.length+dC,dV)/Math.pow(10,+BAL.dec||0);
-  const c=sinCeros(cod);
-  const pb=BAL_PLU[c]; if (pb && porCod.get(pb)) return {p:porCod.get(pb),cod,val};
-  let p=porCod.get(cod)||porCod.get(c)||(porMan.get(c)||[])[0]||(porMan.get(cod)||[])[0]||PRODUCTOS.find(x=>x.cod&&sinCeros(x.cod)===c)||null;
-  return {p,cod,val};
+  // Prueba varios formatos posibles de la Cuora Neo y se queda con el que da un producto de balanza y un peso razonable.
+  if (!/^\d{13}$/.test(t) || t[0]!=="2") return null;
+  const balSet=new Set(Object.values(BAL_PLU));
+  const esBal=p=>p && (balSet.has(p.cod) || p.fv || /FRUTA|VERDUR|FIAMBR|QUESO|CARNE|CARNICER|FRUTOS SECOS|GRANEL|PANADER|ACEITUNA/i.test(p.rubro||""));
+  const fmts=[{pf:String(BAL.prefijos).split(/[,\s]+/)[0]||"20",dC:+BAL.dCod,dV:+BAL.dVal,dec:+BAL.dec||0},
+    {pf:"20",dC:4,dV:6,dec:2},{pf:"2",dC:5,dV:5,dec:0},{pf:"20",dC:5,dV:5,dec:0},{pf:"2",dC:6,dV:5,dec:0},{pf:"20",dC:4,dV:6,dec:0}];
+  let best=null;
+  for (const f of fmts){
+    if (!t.startsWith(f.pf) || f.pf.length+f.dC+f.dV+1!==13) continue;
+    const cod=t.substr(f.pf.length,f.dC), c=sinCeros(cod), val=+t.substr(f.pf.length+f.dC,f.dV)/Math.pow(10,f.dec);
+    const pb=BAL_PLU[c];
+    const p=(pb&&porCod.get(pb)) || porCod.get("PLU"+c) || (porMan.get(c)||[]).find(esBal) || null;
+    if (!esBal(p) || !(val>0)) continue;
+    const kg=p.precio>0? val/p.precio : 1;
+    const score=(pb?2:0)+(kg>=0.005&&kg<=50?3:0)+(kg>=0.05&&kg<=10?1:0);
+    if (!best||score>best.score) best={p,cod:c,val,score};
+  }
+  if (best && best.score>=3) return best;
+  return {p:null,cod:t.substr(2,5),val:0};
 }
 function agregarEtiqueta(e){
-  if (!e.p){ aviso("Etiqueta de balanza: no hay producto con código "+e.cod+"."); return false; }
+  if (!e.p){ aviso("Etiqueta de balanza no reconocida ("+e.cod+"): revisá que el PLU esté cargado en la balanza y en el sistema."); return false; }
   if (e.p.inactivo){ aviso("“"+e.p.desc+"” está dado de baja."); return false; }
   let l;
   if (BAL.modo==="peso"){ l={p:e.p,q:+e.val.toFixed(3)}; }
