@@ -207,6 +207,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnFalt" type="button">Productos faltantes</button>
     <button class="btn" id="btnCompA" type="button">Compras Factura A</button>
     <button class="btn" id="btnVenc" type="button">Vencimientos</button>
+    <button class="btn" id="btnVencCel" type="button" onclick="location.hash='#venc';location.reload()">📱 App vencimientos</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
     <button class="btn" id="btnCierre" type="button">Cerrar caja</button>
     <button class="btn" id="btnFull" type="button">Pantalla completa</button>
@@ -503,6 +504,28 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <div class="label" style="margin-top:12px">Próximos a vencer</div>
     <div id="vcList" class="hist num" style="max-height:40vh"></div>
   </div>
+</div>
+<div id="vcApp" hidden style="position:fixed;inset:0;z-index:60;background:var(--bg);overflow:auto;padding:14px 16px">
+  <div style="display:flex;justify-content:space-between;align-items:center"><div class="brand" style="font-size:24px">Vencimientos <small>carga con el celular</small></div><span id="vaNube" style="font-size:12px;color:var(--muted)"></span></div>
+  <div class="panel" style="margin-top:10px">
+    <label class="label" for="vaQuien">Quién carga</label>
+    <input id="vaQuien" class="input" placeholder="Tu nombre" style="width:100%;font-size:18px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">
+  </div>
+  <div class="panel" style="margin-top:10px">
+    <div class="label">1 · Producto</div>
+    <label class="btn primary" style="display:block;text-align:center;font-size:18px;margin-top:8px">📷 Foto del código de barras<input id="vaFotoCod" type="file" accept="image/*" capture="environment" hidden></label>
+    <input id="vaCod" inputmode="numeric" placeholder="…o escribí el código" style="width:100%;font-size:18px;padding:10px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">
+    <div id="vaProd" style="margin-top:8px;font-weight:700;font-size:17px"></div>
+  </div>
+  <div class="panel" style="margin-top:10px">
+    <div class="label">2 · Fecha de vencimiento</div>
+    <label class="btn primary" style="display:block;text-align:center;font-size:18px;margin-top:8px" id="vaFotoFechaLbl">📷 Foto de la fecha<input id="vaFotoFecha" type="file" accept="image/*" capture="environment" hidden></label>
+    <input id="vaFecha" type="date" style="width:100%;font-size:18px;padding:10px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">
+    <div id="vaFechaEst" class="hint"></div>
+    <input id="vaCant" type="number" min="0" inputmode="numeric" placeholder="Cantidad (opcional)" style="width:100%;font-size:18px;padding:10px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">
+  </div>
+  <button class="btn primary cobrar" id="vaGuardar" type="button" style="margin-top:12px">GUARDAR</button>
+  <div class="panel" style="margin-top:12px"><div class="label">Cargados hoy</div><div id="vaHoy" class="hist num" style="max-height:none"></div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -4089,6 +4112,39 @@ $("vcGuardar").addEventListener("click",()=>{ if(!vcP){ aviso("Escaneá el produ
   const v={id:"v"+Date.now(),cod:vcP.cod,desc:vcP.desc,marca:vcP.marca||"",rubro:vcP.rubro||"",precio:vcP.precio,fecha:f,cant:+$("vcCant").value||0,lacteo:esLacteo(vcP),excluido:esPanExc(vcP),cargo:$("cajero").value.trim(),alta:diaISO(new Date())};
   VENC.push(v); vencGuardar(); vcP=null; ["vcCod","vcFecha","vcCant"].forEach(id=>$(id).value=""); $("vcProd").textContent=""; vcPintar(); render(); aviso(v.excluido?"Guardado (pan excluido de avisos).":"Vencimiento guardado."); $("vcCod").focus(); });
 $("vcList").addEventListener("click",e=>{ const b=e.target.closest("[data-vcb]"); if(!b) return; const v=VENC.find(x=>x.id===b.dataset.vcb); if(v){ v.baja=diaISO(new Date()); vencGuardar(); vcPintar(); render(); } });
+
+// ===== App celular de vencimientos (abrir la caja con #venc al final del link) =====
+(function(){
+  if(location.hash!=="#venc") return;
+  document.querySelectorAll("body > :not(#vcApp):not(#toast):not(script):not(style):not(link):not(title)").forEach(e=>e.style.display="none");
+  $("vcApp").hidden=false; $("vaQuien").value=lsGet("vaQuien","");
+  let vaP=null, SAMPLE=null, USER=null, uid="";
+  window.claude?.use?.("sample").then(x=>{ SAMPLE=x; if(!x) $("vaFotoFechaLbl").style.display="none"; }).catch(()=>{});
+  window.claude?.use?.("user").then(async u=>{ USER=u; try{ uid=u? await u.id():""; }catch(e){} }).catch(()=>{});
+  const est=t=>$("vaFechaEst").textContent=t;
+  function ponerProd(t){ t=String(t||"").trim(); vaP=porLector(t)[0]||buscar(t)||null; $("vaCod").value=t;
+    $("vaProd").textContent = vaP ? vaP.desc+" · "+fmt(vaP.precio)+(esPanExc(vaP)?" · (pan: no se controla)":"") : (t?"No está en el catálogo: "+t:""); }
+  $("vaCod").addEventListener("change",()=>ponerProd($("vaCod").value));
+  async function leerCodigoFoto(file){
+    $("vaProd").textContent="Leyendo código…";
+    try{ if("BarcodeDetector" in window){ const bmp=await createImageBitmap(file); const r=await new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","code_128"]}).detect(bmp); if(r[0]) return r[0].rawValue; } }catch(e){}
+    try{ if(!window.ZXing){ await new Promise((ok,ko)=>{ const sc=document.createElement("script"); sc.src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"; sc.onload=ok; sc.onerror=ko; document.head.append(sc); }); }
+      const url=URL.createObjectURL(file); const r=await new ZXing.BrowserMultiFormatReader().decodeFromImageUrl(url); URL.revokeObjectURL(url); if(r) return r.getText(); }catch(e){}
+    if(SAMPLE){ try{ const j=await SAMPLE.json("Leé los números del código de barras (EAN) de este producto. Respondé solo JSON: {\"codigo\":\"7790...\"} o {\"codigo\":null}.",{images:[file],modelTier:"quick"}); if(j&&j.codigo) return String(j.codigo).replace(/\D/g,""); }catch(e){} }
+    return null; }
+  $("vaFotoCod").addEventListener("change",async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return; const c=await leerCodigoFoto(f); if(c) ponerProd(c); else $("vaProd").textContent="No se pudo leer: escribí el código."; });
+  $("vaFotoFecha").addEventListener("change",async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f||!SAMPLE) return; est("Leyendo la fecha…");
+    try{ const hoy=diaISO(new Date());
+      const j=await SAMPLE.json(`Hoy es ${hoy} (Argentina, formato día/mes/año). En la foto hay una fecha de vencimiento impresa en un envase (puede decir VTO, VENCE, CONSUMIR ANTES DE, o solo dd/mm/aa, mm/aa, etc.). Devolvé la fecha de VENCIMIENTO (no la de elaboración) en JSON: {"fecha":"AAAA-MM-DD","texto":"lo que leíste"}. Si solo hay mes y año, usá el último día de ese mes. Si no se lee, {"fecha":null}.`,{images:[f],modelTier:"quick"});
+      if(j&&j.fecha){ $("vaFecha").value=j.fecha; est("Leído: "+(j.texto||j.fecha)+" → revisá que esté bien."); } else est("No se pudo leer la fecha: cargala a mano.");
+    }catch(err){ est(err&&err.code==="not_granted"?"Sin permiso para leer fotos: cargá la fecha a mano.":"No se pudo leer: cargala a mano."); } });
+  function pintarHoy(){ const h=diaISO(new Date()); $("vaHoy").innerHTML=VENC.filter(v=>v.alta===h&&!v.baja).slice().reverse().map(v=>`<div><span>${v.desc}<br><small>vence ${v.fecha.split("-").reverse().join("/")}${v.cant?" · "+v.cant+" u.":""} · ${v.cargo||""}</small></span></div>`).join("")||"<div>Nada todavía.</div>"; $("vaNube").textContent=NUBE?"Nube conectada":"Sin nube (guarda en este celular)"; }
+  $("vaGuardar").addEventListener("click",()=>{ const quien=$("vaQuien").value.trim(); if(!quien){ aviso("Poné tu nombre."); $("vaQuien").focus(); return; } lsSet("vaQuien",quien);
+    if(!vaP){ aviso("Falta el producto."); return; } const f=$("vaFecha").value; if(!f){ aviso("Falta la fecha."); return; }
+    const v={id:"v"+Date.now(),cod:vaP.cod,desc:vaP.desc,marca:vaP.marca||"",rubro:vaP.rubro||"",precio:vaP.precio,fecha:f,cant:+$("vaCant").value||0,lacteo:esLacteo(vaP),excluido:esPanExc(vaP),cargo:quien,uid,alta:diaISO(new Date()),origen:"celular"};
+    VENC.push(v); vencGuardar(); vaP=null; ["vaCod","vaFecha","vaCant"].forEach(id=>$(id).value=""); $("vaProd").textContent=""; est(""); pintarHoy(); aviso("Guardado ✓"); });
+  setInterval(pintarHoy,4000); pintarHoy();
+})();
 // ===== Factura electrónica ARCA (servicio local en 127.0.0.1:8765) =====
 const ARCA_URL="http://127.0.0.1:8765", ARCA_CUIT="20216950306";
 // Buscar datos del cliente en el padrón de ARCA (servicio local, ws_sr_padron_a13) por CUIT o DNI
