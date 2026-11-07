@@ -537,6 +537,7 @@ else if (ccVer!=="fx2") { const otros=CC.filter(c=>!String(c.id).startsWith("fx"
 try{ localStorage.setItem("cajaCC", JSON.stringify(CC)); localStorage.setItem("cajaCCver","fx2"); }catch(e){}
 const guardarCC = () => { try { localStorage.setItem("cajaCC", JSON.stringify(CC)); } catch(e) {} try{ window.__syncCC&&window.__syncCC(); }catch(e){} };
 function estadoCC(c){
+  if (c && c.autorizada===false) return {cls:"bloq", txt:"SIN AUTORIZAR", dias:0, bloq:true, pend:true};
   if (!c || c.saldo<=0) return {cls:"ok", txt:"Al día", dias:0, bloq:false};
   // El día de la compra cuenta como día 1; el día 30 es el último para pagar y el 31 se corta.
   const d = diasDesde(c.desde)+1, resta = PLAZO_CC-d;
@@ -763,7 +764,7 @@ function render(flash){
   }).join("");
 
   const ccSplit = $("spOn").checked && pago!=="Cuenta corriente" && $("spMed2").value==="Cuenta corriente";
-  if ((pago==="Cuenta corriente" || ccSplit) && faCli){ let cf=ccPorCli(faCli); if(!cf){ cf={id:"fa"+faCli.cod, nombre:faCli.razon, tel:faCli.cel||faCli.tel||"", saldo:0, desde:null, boletas:[], movs:[], cliCod:faCli.cod}; CC.push(cf); guardarCC(); } ccSel=cf.id; }
+  if ((pago==="Cuenta corriente" || ccSplit) && faCli){ let cf=ccPorCli(faCli); if(!cf){ cf={id:"fa"+faCli.cod, nombre:faCli.razon, tel:faCli.cel||faCli.tel||"", saldo:0, desde:null, boletas:[], movs:[], cliCod:faCli.cod, autorizada:false, pedida:new Date().toISOString(), pidio:$("cajero").value.trim()}; CC.push(cf); guardarCC(); try{window.__syncCC&&window.__syncCC();}catch(e){} } ccSel=cf.id; }
   const t = totalesPago();
   $("tTotal").textContent = fmt(t.total);
   { const ccC = CC.find(c=>c.id===ccSel); const nom = faCli ? faCli.razon : ((pago==="Cuenta corriente"||($("spOn").checked&&$("spMed2").value==="Cuenta corriente")) && ccC ? ccC.nombre : "");
@@ -786,6 +787,7 @@ function render(flash){
   $("ccBox").hidden = !esCC;
   if (esCC){
     if (!cli) $("ccEstado").innerHTML = `<div class="est warn">Elegí el cliente para poder cobrar a cuenta.</div>`;
+    else if (ec.pend) $("ccEstado").innerHTML = `<div class="est bloq"><b>Cuenta corriente NUEVA sin autorizar.</b> Llamá a Gustavo: él la habilita desde su teléfono (Cuentas corrientes → Pendientes de autorizar). Hasta entonces no se puede vender a cuenta. <button class="btn" type="button" data-autcc="${cli.id}">Autorizar (clave de Gustavo)</button></div>`;
     else if (ec.bloq) $("ccEstado").innerHTML = `<div class="est bloq"><b>Cuenta cortada.</b> Debe ${fmt(cli.saldo)} desde hace ${ec.dias} días. No puede retirar hasta cancelar el saldo completo.</div>`;
     else $("ccEstado").innerHTML = `<div class="est ${ec.cls}">Saldo actual ${fmt(cli.saldo)} · ${cli.saldo>0?ec.txt:"sin deuda, el plazo arranca con esta compra"}<br>${ccSplit?`Va a la cuenta: <b>${fmt(ccMonto)}</b> · `:""}Saldo después de esta venta: <b>${fmt(cli.saldo+ccMonto)}</b></div>`;
   }
@@ -826,6 +828,12 @@ function deudaHTML(c){
   if (e.bloq) return `<div class="est bloq" style="margin-top:6px"><b>CUENTA CORTADA.</b> Debe ${fmt(c.saldo)} desde hace ${e.dias} días. No puede llevar a cuenta hasta pagar todo.</div>`;
   return `<div class="est warn" style="margin-top:6px"><b>Tiene deuda en cuenta corriente: ${fmt(c.saldo)}</b> · ${e.txt}</div>`;
 }
+async function autorizarCC(id){ const c=CC.find(x=>x.id===id); if(!c) return;
+  let u=null; if (confiable()) u=AUTORIZADOS[0]; else { const k=prompt("Autorizar cuenta corriente de "+c.nombre+"\nClave de Gustavo:"); if(k===null) return; u=await autorizado(k); }
+  if(!u){ registrarIntento("Autorizar cuenta corriente "+c.nombre); aviso("Clave incorrecta. Solo Gustavo puede habilitar cuentas corrientes."); return; }
+  c.autorizada=true; c.autorizo=u.nombre||"Gustavo"; c.autorizadaEl=new Date().toISOString(); guardarCC(); try{window.__syncCC&&window.__syncCC();}catch(e){}
+  aviso("Cuenta corriente de "+c.nombre+" autorizada."); try{renderCtas();}catch(e){} render(); }
+document.addEventListener("click", e=>{ const b=e.target.closest("[data-autcc]"); if(b){ e.stopPropagation(); autorizarCC(b.dataset.autcc); } }, true);
 function renderCtas(){
   const t=normN($("ctaBus").value);
   const ws=t.split(" ").filter(Boolean); const mesAct=diaISO(new Date()).slice(0,7);
@@ -833,7 +841,9 @@ function renderCtas(){
   const lista=CC.filter(c=>{ const n=normN(c.nombre); return c.saldo>0 && pasaF(c) && ws.every(w=>n.includes(w)); }).slice().sort((a,b)=>b.saldo-a.saldo);
   const cort=CC.filter(c=>estadoCC(c).bloq), porV=CC.filter(c=>{const e=estadoCC(c);return !e.bloq&&e.cls==="warn";});
   $("ctaRes").innerHTML=`${CC.filter(c=>c.saldo>0).length} cuentas con saldo · total ${fmt(CC.reduce((a,c)=>a+Math.max(0,c.saldo),0))} · <b style="color:var(--off)">${cort.length} cortadas</b> · ${porV.length} vencen en 5 días o menos`;
-  $("ctaList").innerHTML = lista.map(c=>{const e=estadoCC(c);
+  const pendA=CC.filter(c=>c.autorizada===false);
+  const pendHtml=pendA.length?`<div class="est bloq" style="display:block;margin-bottom:6px"><b>Pendientes de autorizar (${pendA.length})</b>${pendA.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px"><span>${c.nombre}${c.tel?" · "+c.tel:""}${c.pidio?" · pidió "+c.pidio:""}</span><button class="btn primary" type="button" data-autcc="${c.id}">Autorizar</button></div>`).join("")}</div>`:"";
+  $("ctaList").innerHTML = pendHtml + lista.map(c=>{const e=estadoCC(c);
     return `<div data-cta="${c.id}" style="cursor:pointer;flex-wrap:wrap" title="Tocá para ver el detalle"><span>▸ ${c.nombre}${c.tel?` <small>· ${c.tel}</small>`:""}<br><small>${c.saldo>0&&c.desde?`desde ${new Date(c.desde+"T12:00").toLocaleDateString("es-AR")} · día ${e.dias} de 30`:"sin saldo"}</small></span><span style="text-align:right"><b>${fmt(c.saldo)}</b><br><span class="pill ${e.cls}">${e.txt}</span></span></div>`;}).join("") || '<div>No hay clientes con ese nombre.</div>';
 }
 $("btnCtas").addEventListener("click", ()=>{ $("ctaBus").value=""; renderCtas(); $("ctaModal").hidden=false; $("ctaBus").focus(); });
@@ -863,7 +873,7 @@ let ctaF="todas";
 $("ctaChips").addEventListener("click",e=>{ const b=e.target.closest("[data-cf]"); if(!b) return; ctaF=b.dataset.cf; [...$("ctaChips").children].forEach(x=>x.setAttribute("aria-pressed",x===b)); renderCtas(); });
 $("ctaBus").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); abrirPrimera(true); } });
 function renderCC(){
-  const opts = CC.map(c=>{ const e=estadoCC(c); return `<option value="${c.id}">${c.nombre}${c.saldo>0?" · "+fmt(c.saldo):""}${e.bloq?" · CORTADA":""}</option>`; }).join("");
+  const opts = CC.map(c=>{ const e=estadoCC(c); return `<option value="${c.id}">${c.nombre}${c.saldo>0?" · "+fmt(c.saldo):""}${e.pend?" · SIN AUTORIZAR":e.bloq?" · CORTADA":""}</option>`; }).join("");
   const s1 = $("ccCli").value; $("ccCli").innerHTML = `<option value="">— Elegir cliente —</option>`+opts; $("ccCli").value = ccSel || s1 || "";
   const s2 = $("pgCli").value; $("pgCli").innerHTML = CC.filter(c=>c.saldo>0).map(c=>`<option value="${c.id}">${c.nombre}</option>`).join("") || `<option value="">Nadie debe</option>`;
   if ([...$("pgCli").options].some(o=>o.value===s2)) $("pgCli").value = s2;
