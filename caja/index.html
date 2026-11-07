@@ -716,12 +716,8 @@ function agregar(texto){
   if (m){ q = parseFloat(m[1].replace(",", ".")); t = m[2]; }
   if (t==="250" || /^PRODUCTOS? VARIOS$/i.test(t)){   // Productos varios: precio y detalle a mano
     const base=porCod.get("250")||{cod:"250",bc:"",plu:"",desc:"PRODUCTOS VARIOS",rubro:"GENERAL",marca:"",empresa:"",precio:0,iva:21,efe:true};
-    const pr=prompt("PRODUCTOS VARIOS (250)\nPrecio por unidad:",""); if(pr===null) return false;
-    const precio=parseFloat(String(pr).replace(/\./g,"").replace(",","."));
-    if(!(precio>0)){ aviso("Precio inválido."); return false; }
-    const det=(prompt("Detalle (opcional, ej. bolsa de residuos):","")||"").trim();
-    const p=Object.assign({},base,{desc:"PRODUCTOS VARIOS"+(det?" - "+det.toUpperCase():""),precio});
-    carrito.push({p,q}); ultimo=p; render(p); $("scan").value=""; return true;
+    const p=Object.assign({},base,{desc:"PRODUCTOS VARIOS",precio:0});
+    carrito.push({p,q}); ultimo=p; render(p); $("scan").value=""; setTimeout(()=>{const x=$("p"+(carrito.length-1)); if(x){x.focus();x.select();}},0); return true;
   }
   // Mismo código de barras en varios productos: no se elige solo, el cajero indica cuál es.
   const fz = t.match(/^#(\d+)$/), forzado = fz ? repetidos[+fz[1]] : null;   // "#n" = el que eligió el cajero en la lista de repetidos
@@ -754,12 +750,12 @@ function render(flash){
     if (c.desc>0) sub.push(`<span style="color:var(--accent)">${c.motivo} −${fmt(c.desc)}</span>`);
     else if (c.manual) sub.push(`<span style="color:var(--warn)">${c.motivo}</span>`);
     else if (!p.efe) sub.push(`<span>no lleva descuento</span>`);
-    return `<tr class="${flash===p?'flash':''}"><td><div class="desc">${p.desc}${tags}</div><div style="font-size:12px;color:var(--muted)">${p.man&&p.man.length?"<b>"+p.man.join(" / ")+"</b> · ":""}${p.bc||p.cod||("PLU "+p.plu)}${sub.length?" · "+sub.join(" · "):""}</div></td>
-      <td class="r num">${fmt(p.precio)}${(p.fv||p.kg)?'<span style="color:var(--muted)">/kg</span>':''}</td>
+    return `<tr class="${flash===p?'flash':''}"><td><div class="desc">${p.cod==="250"?`PRODUCTOS VARIOS <input id="t${i}" data-det="${i}" value="${(p.desc.replace(/^PRODUCTOS VARIOS( - )?/,"")).replace(/"/g,"&quot;")}" placeholder="detalle (opcional)" aria-label="Detalle" style="width:55%">`:p.desc}${tags}</div><div style="font-size:12px;color:var(--muted)">${p.man&&p.man.length?"<b>"+p.man.join(" / ")+"</b> · ":""}${p.bc||p.cod||("PLU "+p.plu)}${sub.length?" · "+sub.join(" · "):""}</div></td>
+      <td class="r num">${p.cod==="250"?`<input class="num" id="p${i}" data-pr="${i}" value="${p.precio||""}" placeholder="$ precio" inputmode="decimal" aria-label="Precio" style="width:95px;text-align:right">`:fmt(p.precio)}${(p.fv||p.kg)?'<span style="color:var(--muted)">/kg</span>':''}</td>
       <td><span class="qty"><button type="button" data-i="${i}" data-d="-${step}" aria-label="Restar">−</button><input class="num" id="q${i}" data-i="${i}" value="${l.q}" inputmode="decimal" aria-label="Cantidad"><button type="button" data-i="${i}" data-d="${step}" aria-label="Sumar">+</button></span></td>
       <td><span class="dto${c.manual?' on':''}"><input class="num" id="d${i}" data-dto="${i}" value="${c.manual?l.dto:''}" placeholder="" inputmode="decimal" aria-label="Descuento del producto en %">%${c.manual?`<button type="button" data-auto="${i}" title="Volver al descuento automático" aria-label="Volver al descuento automático">↺</button>`:''}</span></td>
       <td class="r num"><b>${fmt(c.neto)}</b>${c.neto!==c.lista?`<div style="font-size:12px;color:var(--muted);text-decoration:line-through">${fmt(c.lista)}</div>`:''}</td>
-      <td>${l.p.cod==="250"?`<button class="del" type="button" data-ed250="${i}" title="Editar precio y detalle" aria-label="Editar">✎</button>`:""}<button class="del" type="button" data-del="${i}" aria-label="Quitar">×</button></td></tr>`;
+      <td><button class="del" type="button" data-del="${i}" aria-label="Quitar">×</button></td></tr>`;
   }).join("");
 
   const ccSplit = $("spOn").checked && pago!=="Cuenta corriente" && $("spMed2").value==="Cuenta corriente";
@@ -794,7 +790,7 @@ function render(flash){
   $("faBox").hidden = !(esA||esB);
   const bGrande = esB && t.total>=TOPE_ID_CF;
   if (esA||esB) pintarFA(esA, bGrande);
-  $("btnCobrar").disabled = !carrito.length || (esCC && (!cli || ec.bloq)) || (esA && !faCli) || (bGrande && !(faCli && (faCli.doc||faCli.cuit)));
+  $("btnCobrar").disabled = !carrito.length || carrito.some(l=>l.p.cod==="250"&&!(l.p.precio>0)) || (esCC && (!cli || ec.bloq)) || (esA && !faCli) || (bGrande && !(faCli && (faCli.doc||faCli.cuit)));
   renderCC();
   const paga = +$("paga").value||0; $("vuelto").textContent = fmt(Math.max(0,paga-t.total));
 
@@ -1056,12 +1052,14 @@ $("tbody").addEventListener("click", e=>{
   if (d){ const l=carrito[d.dataset.i]; l.q=+(l.q+parseFloat(d.dataset.d)).toFixed(3); if (l.q<=0) carrito.splice(d.dataset.i,1); else ultimo=l.p; render(); }
   if (x){ carrito.splice(x.dataset.del,1); render(); }
 });
-$("tbody").addEventListener("click", e=>{ const b=e.target.closest("[data-ed250]"); if(!b) return; const l=carrito[+b.dataset.ed250]; if(!l) return;
-  const det0=l.p.desc.replace(/^PRODUCTOS VARIOS( - )?/,"");
-  const pr=prompt("PRODUCTOS VARIOS (250)\nPrecio por unidad:",String(l.p.precio)); if(pr===null) return;
-  const precio=parseFloat(String(pr).replace(/\./g,"").replace(",",".")); if(!(precio>0)){ aviso("Precio inválido."); return; }
-  const det=prompt("Detalle:",det0); const d=(det===null?det0:det).trim();
-  l.p=Object.assign({},l.p,{precio,desc:"PRODUCTOS VARIOS"+(d?" - "+d.toUpperCase():"")}); render(l.p); });
+function aplicar250(inp){ const i=+(inp.dataset.pr??inp.dataset.det), l=carrito[i]; if(!l) return;
+  if(inp.dataset.pr!==undefined){ const v=inp.value.trim(); const n=v===""?0:parseFloat(v.replace(/\./g,"").replace(",",".")); if(!(n>=0)){ aviso("Precio inválido."); return; } l.p=Object.assign({},l.p,{precio:n}); }
+  else { const d=inp.value.trim(); l.p=Object.assign({},l.p,{desc:"PRODUCTOS VARIOS"+(d?" - "+d.toUpperCase():"")}); }
+  ultimo=l.p; render(); }
+$("tbody").addEventListener("keydown", e=>{ const t=e.target; if(e.key!=="Enter"||(t.dataset.pr===undefined&&t.dataset.det===undefined)) return;
+  e.preventDefault(); const i=+(t.dataset.pr??t.dataset.det), esPr=t.dataset.pr!==undefined; aplicar250(t);
+  const sig=esPr? $("t"+i) : null; if(sig){ sig.focus(); sig.select(); } else $("scan").focus(); });
+$("tbody").addEventListener("change", e=>{ const t=e.target; if(t.dataset.pr!==undefined||t.dataset.det!==undefined) aplicar250(t); });
 $("tbody").addEventListener("click", e=>{ const a=e.target.closest("[data-auto]"); if (a){ delete carrito[a.dataset.auto].dto; render(); }});
 function aplicarDto(inp){
   const l=carrito[inp.dataset.dto], v=inp.value.trim();
