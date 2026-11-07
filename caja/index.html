@@ -260,8 +260,12 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
           <div id="faNuevo" hidden class="cigrid">
             <label for="faRaz">Razón social</label><input id="faRaz" type="text">
             <label for="faCond">Condición IVA</label><select id="faCond"><option>IVA Responsable Inscripto</option><option>Responsable Monotributo</option><option>IVA Exento</option><option>Consumidor Final</option></select>
-            <label for="faCuit">CUIT o DNI</label><input id="faCuit" type="text" inputmode="numeric" placeholder="CUIT (11 números) o DNI">
+            <label for="faCuit">CUIT o DNI</label><span style="display:flex;gap:6px"><input id="faCuit" type="text" inputmode="numeric" placeholder="CUIT (11 números) o DNI" style="flex:1"><button class="btn" id="faArca" type="button">Buscar en ARCA</button></span>
+            <span></span><div id="faArcaRes" style="font-size:13px"></div>
             <label for="faDom">Domicilio</label><input id="faDom" type="text">
+            <label for="faCel">Celular (WhatsApp) *</label><input id="faCel" type="tel" inputmode="tel" placeholder="Ej. 3385 412345">
+            <label for="faTel">Teléfono fijo</label><input id="faTel" type="tel" inputmode="tel">
+            <label for="faMail">Email</label><input id="faMail" type="email">
             <span></span><button class="btn primary" id="faGuardar" type="button">Guardar cliente</button>
           </div>
         </div>
@@ -759,7 +763,7 @@ function render(flash){
   }).join("");
 
   const ccSplit = $("spOn").checked && pago!=="Cuenta corriente" && $("spMed2").value==="Cuenta corriente";
-  if ((pago==="Cuenta corriente" || ccSplit) && faCli){ let cf=ccPorCli(faCli); if(!cf){ cf={id:"fa"+faCli.cod, nombre:faCli.razon, tel:"", saldo:0, desde:null, boletas:[], movs:[], cliCod:faCli.cod}; CC.push(cf); guardarCC(); } ccSel=cf.id; }
+  if ((pago==="Cuenta corriente" || ccSplit) && faCli){ let cf=ccPorCli(faCli); if(!cf){ cf={id:"fa"+faCli.cod, nombre:faCli.razon, tel:faCli.cel||faCli.tel||"", saldo:0, desde:null, boletas:[], movs:[], cliCod:faCli.cod}; CC.push(cf); guardarCC(); } ccSel=cf.id; }
   const t = totalesPago();
   $("tTotal").textContent = fmt(t.total);
   { const ccC = CC.find(c=>c.id===ccSel); const nom = faCli ? faCli.razon : ((pago==="Cuenta corriente"||($("spOn").checked&&$("spMed2").value==="Cuenta corriente")) && ccC ? ccC.nombre : "");
@@ -1314,16 +1318,18 @@ $("faSel").addEventListener("click", e=>{ if (e.target.id==="faCambiar"){ faCli=
 $("faNuevoBtn").addEventListener("click", ()=>{ $("faNuevo").hidden=!$("faNuevo").hidden; $("faRaz").focus(); });
 $("faGuardar").addEventListener("click", ()=>{
   const razon=$("faRaz").value.trim(), num=$("faCuit").value.replace(/\D/g,""), dom=$("faDom").value.trim(), cond=$("faCond").value;
+  const cel=$("faCel").value.replace(/\D/g,""), tel=$("faTel").value.trim(), mail=$("faMail").value.trim();
   if (!razon){ aviso("Falta la razón social o el nombre."); return; }
+  if (cel.length<10){ aviso("Falta el celular (WhatsApp) con característica: 10 números, ej. 3385412345."); $("faCel").focus(); return; }
   let cuit="", doc="";
   if (num.length===11){ if (!cuitValido(num)){ aviso("El CUIT no es válido. Revisá los 11 números."); $("faCuit").focus(); return; } cuit=num; }
   else if (num.length>=7 && num.length<=8 && cond==="Consumidor Final") doc=num;
   else if (cond!=="Consumidor Final" || num){ aviso(cond==="Consumidor Final"?"El DNI tiene que tener 7 u 8 números.":"Para "+cond+" hace falta el CUIT de 11 números."); $("faCuit").focus(); return; }
   if (faModoA && cond!=="IVA Responsable Inscripto"){ aviso("La factura A es solo para Responsables Inscriptos. Para este cliente usá factura B."); return; }
   if (cuit && CLIENTES_RI.some(c=>c.cuit===cuit)){ aviso("Ese CUIT ya está cargado."); return; }
-  const c={cod:"N"+Date.now(),razon:razon.toUpperCase(),cuit,doc,cond,dom:dom.toUpperCase(),nuevo:true};
+  const c={cod:"N"+Date.now(),razon:razon.toUpperCase(),cuit,doc,cond,dom:dom.toUpperCase(),cel,tel,mail,nuevo:true};
   CLIENTES_RI.push(c); try{ localStorage.setItem("cajaClientesRI",JSON.stringify(CLIENTES_RI.filter(x=>x.nuevo))); }catch(e){}
-  faCli=c; $("faNuevo").hidden=true; ["faRaz","faCuit","faDom"].forEach(id=>$(id).value=""); aviso("Cliente guardado."); render(); });
+  faCli=c; $("faNuevo").hidden=true; ["faRaz","faCuit","faDom","faCel","faTel","faMail"].forEach(id=>$(id).value=""); $("faArcaRes").innerHTML=""; aviso("Cliente guardado."); render(); });
 
 
 // =============== MENÚ DE SECCIONES ===============
@@ -4003,6 +4009,24 @@ var qrcode = function() {
 <script>
 // ===== Factura electrónica ARCA (servicio local en 127.0.0.1:8765) =====
 const ARCA_URL="http://127.0.0.1:8765", ARCA_CUIT="20216950306";
+// Buscar datos del cliente en el padrón de ARCA (servicio local, ws_sr_padron_a13) por CUIT o DNI
+let faArcaList=[];
+function faArcaUsar(p){ $("faRaz").value=p.nombre||""; $("faCuit").value=p.cuit||"";
+  $("faDom").value=[p.direccion,p.localidad,p.provincia].filter(Boolean).join(", ");
+  $("faArcaRes").innerHTML=`✓ Datos de ARCA cargados (CUIT ${p.cuit}${p.estado?" · clave "+p.estado:""}). Revisá la condición IVA y completá el celular.`; $("faCel").focus(); }
+$("faArca").addEventListener("click", async()=>{
+  const n=$("faCuit").value.replace(/\D/g,""); if(n.length<7){ aviso("Escribí el CUIT (11 números) o el DNI."); return; }
+  $("faArcaRes").textContent="Buscando en ARCA…";
+  try{ const j=await (await fetch(ARCA_URL+"/padron?doc="+n)).json();
+    if(!j.ok){ $("faArcaRes").textContent=(j.error||"No se encontró")+". Cargá los datos a mano."; return; }
+    faArcaList=j.personas||[];
+    if(faArcaList.length===1) faArcaUsar(faArcaList[0]);
+    else $("faArcaRes").innerHTML="Hay varias personas con ese DNI, elegí: "+faArcaList.map((p,i)=>`<button type="button" class="btn" data-fap="${i}" style="margin:2px">${p.nombre} · ${p.cuit}</button>`).join("");
+  }catch(e){ $("faArcaRes").textContent="No responde el Servicio ARCA de esta computadora (abrí INICIAR_SERVICIO_ARCA). Cargá los datos a mano."; }
+});
+$("faArcaRes").addEventListener("click", e=>{ const b=e.target.closest("[data-fap]"); if(b) faArcaUsar(faArcaList[+b.dataset.fap]); });
+$("faCuit").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); $("faArca").click(); } });
+
 let ARCA=Object.assign({on:false,pv:"8"}, lsGet("cajaArca",{}));
 function arcaGuardar(){ lsSet("cajaArca",ARCA); $("btnArca").textContent="ARCA: "+(ARCA.on?"PV "+ARCA.pv:"apagado"); }
 arcaGuardar();
