@@ -759,7 +759,7 @@ function render(flash){
       <td><span class="qty"><button type="button" data-i="${i}" data-d="-${step}" aria-label="Restar">−</button><input class="num" id="q${i}" data-i="${i}" value="${l.q}" inputmode="decimal" aria-label="Cantidad"><button type="button" data-i="${i}" data-d="${step}" aria-label="Sumar">+</button></span></td>
       <td><span class="dto${c.manual?' on':''}"><input class="num" id="d${i}" data-dto="${i}" value="${c.manual?l.dto:''}" placeholder="" inputmode="decimal" aria-label="Descuento del producto en %">%${c.manual?`<button type="button" data-auto="${i}" title="Volver al descuento automático" aria-label="Volver al descuento automático">↺</button>`:''}</span></td>
       <td class="r num"><b>${fmt(c.neto)}</b>${c.neto!==c.lista?`<div style="font-size:12px;color:var(--muted);text-decoration:line-through">${fmt(c.lista)}</div>`:''}</td>
-      <td><button class="del" type="button" data-del="${i}" aria-label="Quitar">×</button></td></tr>`;
+      <td>${l.p.cod==="250"?`<button class="del" type="button" data-ed250="${i}" title="Editar precio y detalle" aria-label="Editar">✎</button>`:""}<button class="del" type="button" data-del="${i}" aria-label="Quitar">×</button></td></tr>`;
   }).join("");
 
   const ccSplit = $("spOn").checked && pago!=="Cuenta corriente" && $("spMed2").value==="Cuenta corriente";
@@ -1056,6 +1056,12 @@ $("tbody").addEventListener("click", e=>{
   if (d){ const l=carrito[d.dataset.i]; l.q=+(l.q+parseFloat(d.dataset.d)).toFixed(3); if (l.q<=0) carrito.splice(d.dataset.i,1); else ultimo=l.p; render(); }
   if (x){ carrito.splice(x.dataset.del,1); render(); }
 });
+$("tbody").addEventListener("click", e=>{ const b=e.target.closest("[data-ed250]"); if(!b) return; const l=carrito[+b.dataset.ed250]; if(!l) return;
+  const det0=l.p.desc.replace(/^PRODUCTOS VARIOS( - )?/,"");
+  const pr=prompt("PRODUCTOS VARIOS (250)\nPrecio por unidad:",String(l.p.precio)); if(pr===null) return;
+  const precio=parseFloat(String(pr).replace(/\./g,"").replace(",",".")); if(!(precio>0)){ aviso("Precio inválido."); return; }
+  const det=prompt("Detalle:",det0); const d=(det===null?det0:det).trim();
+  l.p=Object.assign({},l.p,{precio,desc:"PRODUCTOS VARIOS"+(d?" - "+d.toUpperCase():"")}); render(l.p); });
 $("tbody").addEventListener("click", e=>{ const a=e.target.closest("[data-auto]"); if (a){ delete carrito[a.dataset.auto].dto; render(); }});
 function aplicarDto(inp){
   const l=carrito[inp.dataset.dto], v=inp.value.trim();
