@@ -4188,7 +4188,7 @@ $("arcaProbar").addEventListener("click",async()=>{ $("arcaEst").textContent="Pr
 function arcaPend(){ const n=ventas.filter(v=>v.arca&&v.arca.pendiente).length; $("arcaEst").textContent = n ? `${n} venta(s) con CAE pendiente.` : "Sin CAE pendientes."; return n; }
 $("arcaReint").addEventListener("click",async()=>{ for(const v of ventas.filter(v=>v.arca&&v.arca.pendiente)){ await arcaPedir(v,false); } arcaPend(); });
 const COND={"IVA Responsable Inscripto":1,"Responsable Inscripto":1,"IVA Sujeto Exento":4,"Exento":4,"Consumidor Final":5,"Responsable Monotributo":6,"Monotributo":6};
-function ivaDe(cod){ const p=PRODUCTOS.find(x=>x.cod===cod); if(p&&(p.cig||/cigarr|tabaco/i.test(p.rubro||""))) return 0; /* cigarrillos: el IVA lo ingresa el fabricante; el revendedor no lo discrimina */ if(p&&p.iva!=null) return +p.iva; return p&&p.fv?10.5:21; }
+function ivaDe(cod){ const p=PRODUCTOS.find(x=>x.cod===cod); if(p&&p.iva!=null) return +p.iva; return p&&p.fv?10.5:21; }
 function arcaPayload(v){
   const esA=v.comp==="Factura A", c=v.clienteFA; let docTipo=99, docNro=0, cond=5;
   if(c){ const cuit=String(c.cuit||"").replace(/\D/g,""), dni=String(c.doc||"").replace(/\D/g,"");
