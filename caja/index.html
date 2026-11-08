@@ -1118,8 +1118,8 @@ function cobrar(){
 }
 function imprimirTicket(v){
   const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
-  const h=`<html><head><meta charset="utf-8"><style>@page{size:58mm auto;margin:2mm}body{font-family:monospace;font-size:11px;width:54mm;margin:0}
-  .c{text-align:center}.r{display:flex;justify-content:space-between;gap:4px}.t{font-size:15px;font-weight:bold}hr{border:0;border-top:1px dashed #000}</style></head><body>
+  const h=`<html><head><meta charset="utf-8"><style>@page{size:58mm auto;margin:0}body{font-family:Arial,sans-serif;font-size:11px;width:44mm;margin:0 0 0 1mm;overflow-wrap:anywhere}
+  .c{text-align:center}.r{display:flex;justify-content:space-between;gap:4px}.t{font-size:14px;font-weight:bold}hr{border:0;border-top:1px dashed #000}</style></head><body>
   <div class="c t">SUPERCORDOBES</div><div class="c">General Paz 370 - Gral. Levalle</div><hr>
   <div>Venta #${v.nro} - ${v.fecha} ${v.hora}</div><div>${esc(v.caja)} - ${esc(v.cajero)}</div><hr>
   ${v.items.map(i=>`<div>${esc(i.q)} ${esc(i.desc)}</div><div class="r"><span></span><span>${fmt(i.importe)}</span></div>`).join("")}
@@ -4349,7 +4349,7 @@ imprimirTicket=function(v){
   if(!(v.arca&&v.arca.cae)) return imprimirTicketOrig(v);
   const a=v.arca, esA=a.tipo===1, esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])), f=a.fecha, fv=String(a.caeVto);
   const qr=arcaQR(v), c=v.clienteFA;
-  const h=`<html><head><meta charset="utf-8"><style>@page{size:58mm auto;margin:2mm}body{font-family:monospace;font-size:10.5px;width:54mm;margin:0}.c{text-align:center}.r{display:flex;justify-content:space-between;gap:4px}.t{font-size:14px;font-weight:bold}hr{border:0;border-top:1px dashed #000}</style></head><body>
+  const h=`<html><head><meta charset="utf-8"><style>@page{size:58mm auto;margin:0}body{font-family:Arial,sans-serif;font-size:10.5px;width:44mm;margin:0 0 0 1mm;overflow-wrap:anywhere}.c{text-align:center}.r{display:flex;justify-content:space-between;gap:4px}.t{font-size:14px;font-weight:bold}hr{border:0;border-top:1px dashed #000}</style></head><body>
   <div class="c t">SUPER CORDOBES</div><div class="c">de FERNANDEZ GUSTAVO GABRIEL</div><div class="c">General Paz 370 - Gral. Levalle (6132)</div>
   <div>CUIT 20-21695030-6 · IVA Resp. Inscripto</div><div>IIBB 20-21695030-6 · Inicio act. 03/2020</div><hr>
   <div class="c t">FACTURA ${esA?"A":"B"}</div><div class="c">Cód. ${esA?"001":"006"} · ORIGINAL</div>
