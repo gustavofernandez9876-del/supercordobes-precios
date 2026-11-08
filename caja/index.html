@@ -231,10 +231,11 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <div class="scan">
       <input id="scan" autocomplete="off" placeholder="Escaneá el código o escribí una palabra (ej. leche)">
       <button class="btn primary" id="btnAdd" type="button">Agregar</button>
+      <button class="btn" id="btnPluMano" type="button" title="Etiqueta de balanza que no pasa: cargá el PLU y el importe impresos">PLU a mano</button>
       <div class="sugg" id="sugg" hidden></div>
     </div>
     <div class="hint" id="catInfo" style="font-weight:600">Cargando catálogo…</div>
-    <div class="hint">Buscá por cualquier palabra (ej. <b>leche</b>, <b>dulce leche</b>, <b>yerba 500</b>) · Enter agrega · <b>6*código</b> carga 6 unidades · en frutas y verduras la cantidad va en kilos (ej. <b>1.25*tomate</b>)</div>
+    <div class="hint">Buscá por cualquier palabra (ej. <b>leche</b>, <b>dulce leche</b>, <b>yerba 500</b>) · Enter agrega · <b>6*código</b> carga 6 unidades · en frutas y verduras la cantidad va en kilos (ej. <b>1.25*tomate</b>) · etiqueta de balanza que no pasa: <b>PLU 41 5856</b> (PLU e importe impresos)</div>
     <div class="lines">
       <table>
         <thead><tr><th>Producto</th><th class="r">Precio</th><th>Cant.</th><th>Dto.</th><th class="r">Importe</th><th></th></tr></thead>
@@ -784,12 +785,18 @@ fetch("productos.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(ro
 // PLU cargados en la balanza (Supercordobes_balanza_84.csv, 166 PLU, actualizado 08/11/2026) → código del sistema
 const BAL_PLU={"1": "0484", "2": "0485", "3": "0155", "4": "0157", "5": "0165", "6": "0496", "7": "0886", "8": "1511", "9": "1513", "10": "1803", "11": "2095", "12": "2096", "13": "2402", "14": "2403", "15": "2407", "16": "2404", "17": "2582", "18": "2583", "19": "2722", "20": "2730", "21": "3175", "22": "4315", "23": "7252", "24": "7254", "25": "7253", "26": "8771", "27": "8770", "28": "9138", "29": "9107", "30": "9218", "31": "9223", "32": "341974", "33": "9670", "34": "9932", "35": "10028", "36": "10128", "37": "10058", "38": "341971", "39": "341972", "40": "11404", "41": "11408", "42": "11398", "43": "11399", "44": "12431", "45": "12433", "46": "12434", "47": "12435", "48": "12432", "49": "11403", "50": "10059", "51": "10060", "52": "8792", "53": "7780", "54": "341960", "55": "341960", "56": "8036", "57": "8036", "58": "10312", "59": "342313", "60": "341955", "61": "7301", "62": "341973", "63": "9314", "64": "12433", "65": "4789", "66": "341970", "67": "2564", "68": "2402", "69": "342314", "70": "1333", "71": "9345", "72": "9129", "73": "8561", "74": "11398", "75": "8562", "76": "9223", "77": "11641", "78": "341975", "79": "12434", "80": "8336", "81": "11404", "82": "11408", "83": "8770", "84": "3114", "85": "342039", "86": "342040", "87": "342041", "88": "342042", "89": "342043", "90": "342044", "91": "342045", "301": "342301", "302": "342302", "303": "342303", "304": "342304", "305": "342305", "306": "342306", "307": "342307", "308": "342308", "309": "342309", "310": "342310", "311": "342311", "312": "342312", "104": "2387", "120": "8497", "140": "1769", "141": "6467", "144": "6471", "145": "8293", "146": "8536", "148": "7569", "149": "8728", "152": "10233", "155": "1106", "156": "1107", "176": "1481", "178": "4083", "179": "0136", "183": "9724", "184": "1381", "185": "3403", "186": "3402", "187": "5592", "189": "5593", "191": "9054", "193": "11603", "194": "4747", "196": "3404", "197": "8307", "202": "0841", "203": "0842", "126": "9251", "113": "341957", "127": "8872", "99": "342064", "128": "342066", "129": "342067", "95": "1480", "114": "0906", "130": "342065", "131": "341964", "132": "11638", "133": "11640", "92": "8337", "93": "3112", "96": "342071", "97": "341963", "100": "341962", "101": "342073", "102": "6485", "103": "7881", "134": "7885", "105": "341968", "106": "341969", "107": "342077", "108": "342078", "110": "342079", "112": "342080", "115": "342081", "116": "342082", "117": "341961", "121": "342083", "122": "342084", "123": "342085", "124": "342086", "125": "342087", "204": "90204", "205": "90205", "206": "90206"};
 const BAL_DEF={prefijos:"20",dCod:4,dVal:6,modo:"precio",dec:2};
+const BAL_FIJOS=["2050100002044"];
 let BAL=Object.assign({},BAL_DEF); try{ const g=JSON.parse(localStorage.getItem("cajaBal")||"{}"); if(g.v===3) Object.assign(BAL,g); }catch(e){}
 BAL.v=3;
 function guardarBal(){ try{ localStorage.setItem("cajaBal",JSON.stringify(BAL)); }catch(e){} }
 function leerEtiqueta(t){
   // Prueba varios formatos posibles de la Cuora Neo y se queda con el que da un producto de balanza y un peso razonable.
   if (!/^\d{13}$/.test(t) || t[0]!=="2") return null;
+  // Dígito verificador: si no da, el lector leyó mal (etiqueta arrugada, mojada o cortada). No se cobra nada adivinando.
+  { let s=0; for(let i=0;i<12;i++) s+= +t[i]*(i%2?3:1); if ((10-s%10)%10!== +t[12]) return {p:null,cod:"",val:0,mal:true}; }
+  // Código fijo que imprime la Cuora en los PLU que tienen mal configurado el código de barras (lechuga, tomate, ajo, cebolla, zapallito…):
+  // siempre el mismo número, sin PLU ni importe. Hay que cargar a mano el PLU y el importe impresos en la etiqueta.
+  if (BAL_FIJOS.includes(t)) return {p:null,cod:"",val:0,fijo:true};
   const balSet=new Set(Object.values(BAL_PLU));
   const esBal=p=>p && (balSet.has(p.cod) || p.fv || /FRUTA|VERDUR|FIAMBR|QUESO|CARNE|CARNICER|FRUTOS SECOS|GRANEL|PANADER|ACEITUNA/i.test(p.rubro||""));
   const fmts=[{pf:String(BAL.prefijos).split(/[,\s]+/)[0]||"20",dC:+BAL.dCod,dV:+BAL.dVal,dec:+BAL.dec||0},
@@ -821,15 +828,41 @@ function leerEtiqueta(t){
   return {p:null,cod:t.substr(2,5),val:0};
 }
 function agregarEtiqueta(e){
-  if (!e.p){ aviso("Etiqueta de balanza no reconocida ("+e.cod+"): revisá que el PLU esté cargado en la balanza y en el sistema."); return false; }
+  if (!e.p){
+    // Nunca se pierde la venta: se abre la carga a mano con el PLU y el importe que dice la etiqueta.
+    const msg = e.mal ? "La etiqueta se leyó mal (no coincide el dígito verificador). Volvé a pasarla, o cargá el PLU y el importe que dice."
+      : e.fijo ? "Esta etiqueta trae un código fijo de la balanza (sin PLU ni importe). Cargá el PLU y el importe que dice impresos."
+      : "Etiqueta de balanza no reconocida"+(e.cod?" (código "+e.cod+")":"")+". Cargá el PLU y el importe que dice impresos.";
+    if (typeof abrirPluMano==="function"){ abrirPluMano(msg); return false; }
+    aviso(msg); return false; }
   if (e.p.inactivo){ aviso("“"+e.p.desc+"” está dado de baja."); return false; }
   let l;
   if (BAL.modo==="peso"){ l={p:e.p,q:+e.val.toFixed(3)}; }
   else { const kg = e.p.precio>0 ? +(e.val/e.p.precio).toFixed(3) : 1; l={p:e.p,q:kg,fijo:e.val,bal:true}; }
   carrito.push(l); ultimo=e.p; render(e.p); return true;
 }
+// ===== PLU de balanza a mano =====
+// Para etiquetas que no traen un código válido (código fijo, sin código de barras, mal leída):
+// el cajero escribe el PLU y el importe impresos en la etiqueta y se cobra exactamente ese importe.
+function leerImporte(v){ v=String(v||"").trim().replace(/\$|\s/g,"");
+  if (v.includes(",")) v=v.replace(/\./g,"").replace(",",".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(v)) v=v.replace(/\./g,"");
+  return parseFloat(v); }
+function prodPlu(n){ n=sinCeros(String(n||"").trim()); if (!/^\d+$/.test(n)) return null;
+  if (n==="0"){ const b=porCod.get("250")||{cod:"250",bc:"",plu:"",desc:"PRODUCTOS VARIOS",rubro:"GENERAL",marca:"",empresa:"",precio:0,iva:21,efe:true};
+    return Object.assign({},b,{cod:"250V",desc:"VARIOS (BALANZA)",precio:0,iva:21}); }
+  const pb=BAL_PLU[n]; return (pb&&porCod.get(pb)) || null; }
+function agregarPlu(n, importe){
+  const p=prodPlu(n);
+  if (!p){ aviso("El PLU "+n+" no está en la tabla de la balanza del sistema."); return false; }
+  if (!(importe>0)){ aviso("Falta el importe de la etiqueta."); return false; }
+  if (p.inactivo){ aviso("“"+p.desc+"” está dado de baja."); return false; }
+  const val=Math.round(importe*100)/100, kg = p.precio>0 ? +(val/p.precio).toFixed(3) : 1;
+  carrito.push({p,q:kg,fijo:val,bal:true,plumano:true}); ultimo=p; render(p); return true; }
 function agregar(texto){
   let t = texto.trim(), q = 1;
+  { const m=t.match(/^p(?:lu)?\s*(\d{1,4})(?:\s*[\s=$:]\s*\$?\s*([\d.,]+))?$/i);
+    if (m){ if (!m[2]){ abrirPluMano("", m[1]); return false; } return agregarPlu(m[1], leerImporte(m[2])); } }
   { const tt=t; if (!porBarra.get(tt)) { const e=leerEtiqueta(tt); if (e) return agregarEtiqueta(e); } }
   const m = t.match(/^([\d.,]+)\s*\*\s*(.+)$/);
   if (m){ q = parseFloat(m[1].replace(",", ".")); t = m[2]; }
@@ -1820,7 +1853,7 @@ confirmarCierre=function(){ const n=cierres.length; _confirmarCierrePP(); if(cie
   function pintar(){ g("balPre").value=BAL.prefijos; g("balCod").value=BAL.dCod; g("balVal").value=BAL.dVal; g("balModo").value=BAL.modo; g("balDec").value=BAL.dec; probar(); }
   function leer(){ BAL.prefijos=g("balPre").value.trim()||"20"; BAL.dCod=+g("balCod").value||4; BAL.dVal=+g("balVal").value||6; BAL.modo=g("balModo").value; BAL.dec=+g("balDec").value||0; }
   function probar(){ leer(); const t=g("balTest").value.trim(); if(!t){ g("balRes").textContent="Formato: "+BAL.prefijos.split(",")[0]+" + "+"C".repeat(BAL.dCod)+" + "+"P".repeat(BAL.dVal)+" + 1 verificador = "+(BAL.prefijos.split(",")[0].length+BAL.dCod+BAL.dVal+1)+" dígitos"; return; }
-    const e=leerEtiqueta(t); g("balRes").innerHTML = !e ? "<b>No coincide con el formato.</b>" : (e.p? "✓ "+e.p.desc+" · "+(BAL.modo==="peso"? e.val.toFixed(3)+" kg" : "$ "+e.val.toLocaleString("es-AR")) : "Código "+e.cod+": <b>no existe en el catálogo</b>"); }
+    const e=leerEtiqueta(t); g("balRes").innerHTML = !e ? "<b>No coincide con el formato.</b>" : (e.p? "✓ "+e.p.desc+" · "+(BAL.modo==="peso"? e.val.toFixed(3)+" kg" : "$ "+e.val.toLocaleString("es-AR")) : e.mal ? "<b>Mal leída:</b> no coincide el dígito verificador." : e.fijo ? "<b>Código fijo de la balanza</b> (sin PLU ni importe): ese PLU tiene mal el código de barras en la balanza." : "Código "+e.cod+": <b>no existe en el catálogo</b>"); }
   ["balPre","balCod","balVal","balModo","balDec","balTest"].forEach(id=>g(id).addEventListener("input",probar));
   g("btnBal").addEventListener("click",()=>{ pintar(); m.hidden=false; m.style.display="flex"; g("balTest").focus(); });
   g("balDef").addEventListener("click",()=>{ Object.assign(BAL,BAL_DEF); pintar(); });
@@ -1829,6 +1862,44 @@ confirmarCierre=function(){ const n=cierres.length; _confirmarCierrePP(); if(cie
 })();
 </script>
 
+<div class="modal" id="pluModal" hidden>
+  <div class="ticket" role="dialog" aria-labelledby="pluTit" style="max-width:400px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <h3 id="pluTit" style="margin:0">PLU de balanza a mano</h3>
+      <button class="del" id="pluCerrar" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <p id="pluMsg" style="margin:6px 0 10px;font-size:14px;color:var(--off)" hidden></p>
+    <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">Escribí el <b>PLU</b> y el <b>importe ($)</b> que están impresos en la etiqueta. Se cobra ese importe.</p>
+    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px">
+      <label>PLU<input id="pluNum" inputmode="numeric" autocomplete="off" style="width:100%;font-size:20px;padding:8px;border:1px solid var(--line);border-radius:6px"></label>
+      <label>Importe $<input id="pluImp" inputmode="decimal" autocomplete="off" placeholder="ej. 5856,00" style="width:100%;font-size:20px;padding:8px;border:1px solid var(--line);border-radius:6px"></label>
+    </div>
+    <div id="pluProd" style="margin:10px 0;min-height:22px;font-weight:600"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" id="pluCancelar" type="button">Cancelar</button><button class="btn primary" id="pluOk" type="button">Agregar</button></div>
+  </div>
+</div>
+<script>
+// ===== PLU de balanza a mano (etiquetas sin código válido) =====
+(function(){
+  const g=id=>document.getElementById(id);
+  function pintar(){ const n=g("pluNum").value.trim(), p=n?prodPlu(n):null, imp=leerImporte(g("pluImp").value);
+    g("pluProd").innerHTML = !n ? "" : !p ? '<span style="color:var(--off)">PLU '+escH(n)+' no está cargado en el sistema</span>'
+      : escH(p.desc)+(p.precio>0?' · '+fmt(p.precio)+' el kg/u'+(imp>0?' · ≈ '+(imp/p.precio).toLocaleString("es-AR",{maximumFractionDigits:3}):''):''); }
+  function cerrar(){ g("pluModal").hidden=true; $("scan").focus(); }
+  function ok(){ const n=g("pluNum").value.trim(); if(!n){ g("pluNum").focus(); return; }
+    if(!prodPlu(n)){ aviso("El PLU "+n+" no está en la tabla de la balanza del sistema."); g("pluNum").select(); return; }
+    const imp=leerImporte(g("pluImp").value); if(!(imp>0)){ g("pluImp").focus(); return; }
+    if (agregarPlu(n, imp)) cerrar(); }
+  window.abrirPluMano=function(msg, plu){ g("pluMsg").textContent=msg||""; g("pluMsg").hidden=!msg;
+    g("pluNum").value=plu||""; g("pluImp").value=""; pintar(); g("pluModal").hidden=false; $("scan").value=""; $("sugg").hidden=true;
+    setTimeout(()=>{ (plu?g("pluImp"):g("pluNum")).focus(); },0); };
+  ["pluNum","pluImp"].forEach(id=>{ g(id).addEventListener("input",pintar);
+    g(id).addEventListener("keydown",e=>{ if(e.key==="Escape") cerrar();
+      if(e.key==="Enter"){ e.preventDefault(); if(id==="pluNum" && !g("pluImp").value.trim()) g("pluImp").focus(); else ok(); } }); });
+  g("pluOk").addEventListener("click",ok); g("pluCancelar").addEventListener("click",cerrar); g("pluCerrar").addEventListener("click",cerrar);
+  g("btnPluMano").addEventListener("click",()=>abrirPluMano(""));
+})();
+</script>
 <div class="modal" id="faltModal" hidden>
   <div class="ticket ci" role="dialog" aria-labelledby="faltTit" style="max-width:640px;width:100%">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
