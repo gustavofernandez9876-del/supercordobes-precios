@@ -1636,8 +1636,8 @@ $("coTb").addEventListener("click",e=>{ const tr=e.target.closest("[data-nro]");
     v.items.map(i=>`<div class="tl num"><span>${i.q} ${escH(i.desc)}</span><span>${fmt(i.importe)}</span></div>`).join("")+
     `<hr><div class="tl num" style="font-size:20px;font-weight:700"><span>TOTAL</span><span>${fmt(v.total)}</span></div><div class="tl"><span>${escH(v.pago)}</span><span>${escH(v.clienteFA?.razon||v.cliente||"Consumidor final")}</span></div>`+
     (v.motivo?`<div class="tl"><span>Motivo</span><span>${escH(v.motivo)}</span></div><div class="tl"><span>Autorizó</span><span>${escH(v.autorizo)}</span></div>`:"")+
-    `<button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:14px">Cerrar</button>`;
-  $("modal").hidden=false; });
+    `<button class="btn primary" id="btnReimp" type="button" style="width:100%;margin-top:14px">🖨 Reimprimir ticket</button><button class="btn" id="btnVolverNC" type="button" style="width:100%;margin-top:6px">Cerrar</button>`;
+  $("modal").hidden=false; $("btnReimp").onclick=()=>{ try{ imprimirTicket(v); }catch(e){ aviso("No se pudo imprimir: "+e.message); } }; });
 
 function marcarFull(){ $("btnFull").textContent = document.fullscreenElement ? "Salir de pantalla completa" : "Pantalla completa"; }
 $("btnFull").addEventListener("click", ()=>{
