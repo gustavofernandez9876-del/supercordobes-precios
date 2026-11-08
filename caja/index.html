@@ -1415,7 +1415,7 @@ const TOPE_ID_CF = 10000000;
 let faModoA = true;
 fetch("clientes.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(rows=>{
   const propios=CLIENTES_RI.filter(c=>c.nuevo);
-  CLIENTES_RI=rows.map(([cod,razon,cuit,cond,dom,doc])=>({cod,razon,cuit,cond,dom,doc})).concat(propios);
+  CLIENTES_RI=rows.map(([cod,razon,cuit,cond,dom,doc,tel])=>({cod,razon,cuit,cond,dom,doc,tel:tel||""})).concat(propios);
   aplicarEditsCli();
 }).catch(()=>{});
 const idCli=c=>c.cuit?("CUIT "+fmtCuit(c.cuit)):c.doc?("DNI "+c.doc):"sin documento";
@@ -1432,7 +1432,7 @@ function buscarFA(){
   const base = faModoA ? CLIENTES_RI.filter(c=>c.cond==="IVA Responsable Inscripto" || (!c.cond && (c.cuit||"").replace(/\D/g,"").length===11)) : CLIENTES_RI;
   if (t.length<2){ $("faRes").innerHTML=`<div class="hint">${base.length} clientes cargados${faModoA?" (Responsables Inscriptos)":""}. Escribí parte del nombre, CUIT o DNI.</div>`; return; }
   const hits=base.filter(c=>norm(c.razon).includes(t) || (d.length>=3 && ((c.cuit||"").includes(d) || (c.doc||"").includes(d)))).slice(0,30);
-  $("faRes").innerHTML = hits.length ? hits.map(c=>`<button type="button" data-cod="${c.cod}"><b>${c.razon}</b><br><small>${idCli(c)} · ${c.cond||"condición IVA sin cargar"}${c.dom?" · "+c.dom:""}${c.cuit&&!cuitValido(c.cuit)?" · ⚠ CUIT inválido, revisar":""}</small></button>`).join("")
+  $("faRes").innerHTML = hits.length ? hits.map(c=>`<button type="button" data-cod="${c.cod}"><b>${c.razon}</b><br><small>${idCli(c)} · ${c.cond||"condición IVA sin cargar"}${c.dom?" · "+c.dom:""}${c.tel?" · tel. "+c.tel:""}${c.cuit&&!cuitValido(c.cuit)?" · ⚠ CUIT inválido, revisar":""}</small></button>`).join("")
     : '<div class="hint">No está cargado. Usá “+ Cliente nuevo”.</div>';
 }
 $("faBus").addEventListener("input", buscarFA);
