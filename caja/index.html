@@ -635,9 +635,9 @@ function calcLinea(l){
     desc = bruto*l.dto/100; motivo = l.dto>0 ? `dto. ${l.dto}% individual` : "sin descuento (individual)";
     return {lista, oferta: Math.max(0, Math.round(lista-bruto-cD)), combo:cD, comboU:cU, desc, neto: bruto-desc, motivo, enOferta: ofertaUnid>0, manual:true};
   }
-  if ((p.cig || /cigarr/i.test(p.rubro||"")) && pago !== "Efectivo"){
-    // Cigarrillos: sin descuento en efectivo; con cualquier otro medio de pago llevan 10% de recargo.
-    desc = -bruto*0.10; motivo = "+10% recargo cigarrillos (no efectivo)";
+  if (p.cig || /cigarr|tabaco/i.test(p.rubro||"")){
+    // Cigarrillos: NUNCA descuento. En efectivo precio de lista; con cualquier otro medio de pago, 10% de recargo.
+    if (pago !== "Efectivo"){ desc = -bruto*0.10; motivo = "+10% recargo cigarrillos (no efectivo)"; }
   }
   else if ((pago === "QR" || pago === "Transferencia") && p.efe && packRegla(p)){
     // Pack cerrado pagado con QR o transferencia: 5% solo sobre las unidades que completan el pack.
@@ -729,7 +729,7 @@ function stockDe(p){ if(!p||STOCK.s[p.cod]==null) return null; let n=+STOCK.s[p.
   return Math.round(n*100)/100; }
 function stockTxt(p){ const n=stockDe(p); return n==null?'<span style="color:var(--muted)">sin dato</span>':`<b style="color:${n<=0?'var(--off)':'var(--accent)'}">${n.toLocaleString('es-AR')}</b>`; }
 fetch("productos.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(rows=>{
-  PRODUCTOS = rows.map(([cod,bc,desc,rubro,marca,precio,fl,empresa,iva])=>({cod,bc,plu:"",desc,rubro,marca,empresa:empresa||"",precio,iva:(iva===""||iva==null)?null:+iva,efe:!fl.includes("n"),fv:fl.includes("f"),cig:/CIGARR|TABACO/i.test(rubro||"")}));
+  PRODUCTOS = rows.map(([cod,bc,desc,rubro,marca,precio,fl,empresa,iva])=>({cod,bc,plu:"",desc,rubro,marca,empresa:empresa||"",precio,iva:(iva===""||iva==null)?null:+iva,efe:!fl.includes("n"),fv:fl.includes("f"),cig:/CIGARR|TABACO/i.test(rubro||"")})).map(p=>{ if(p.cig) p.efe=false; return p; });
   catalogoReal=true; aplicarEditsProd(); indexar();
   carrito=[]; ultimo=null;
   ["6*7790742625502","7793704000928","1.25*11408"].forEach(c=>agregar(c));
