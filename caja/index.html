@@ -207,6 +207,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnFalt" type="button">Productos faltantes</button>
     <button class="btn" id="btnCompA" type="button">Compras Factura A</button>
     <button class="btn" id="btnPagProv" type="button">Pago a proveedores</button>
+    <button class="btn" id="btnCheques" type="button">Cheques a pagar</button>
     <button class="btn" id="btnVenc" type="button">Vencimientos</button>
     <button class="btn" id="btnVencCel" type="button" onclick="location.hash='#venc';location.reload()">📱 App vencimientos</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
@@ -491,9 +492,15 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
       <label for="ppComp">Factura / remito N°</label><input id="ppComp" type="text" placeholder="Ej. 0004-00274785">
       <label for="ppMonto">Monto pagado</label><input id="ppMonto" type="number" min="0" step="any" inputmode="decimal">
       <label for="ppMedio">Cómo se paga</label><select id="ppMedio"><option>Efectivo de la caja</option><option>Transferencia</option><option>Cheque</option><option>Débito</option><option>Efectivo (fuera de la caja)</option></select>
-      <label for="ppObs">Observación</label><input id="ppObs" type="text" placeholder="Opcional (ej. N° de cheque)">
+      <label for="ppChN" class="ppCh" hidden>N° de cheque *</label><input id="ppChN" class="ppCh" hidden type="text" inputmode="numeric" placeholder="Ej. 2832">
+      <label for="ppChF" class="ppCh" hidden>Fecha de cobro *</label><input id="ppChF" class="ppCh" hidden type="date">
+      <label for="ppChB" class="ppCh" hidden>Banco</label><input id="ppChB" class="ppCh" hidden type="text" placeholder="Opcional">
+      <label for="ppObs">Observación</label><input id="ppObs" type="text" placeholder="Opcional">
       <span></span><button class="btn primary" id="ppGuardar" type="button">Registrar pago</button>
     </div>
+    <div class="label" style="margin-top:12px">Cheques a pagar</div>
+    <div id="chRes" class="sumgrid num"></div>
+    <div id="chList" class="hist num" style="max-height:32vh"></div>
     <div class="label" style="margin-top:12px">Pagos registrados (últimos)</div>
     <div id="ppList" class="hist num"></div>
   </div>
@@ -1744,14 +1751,37 @@ pintarNube();
 let PROVEEDORES=[]; fetch("proveedores.json").then(r=>r.ok?r.json():[]).then(r=>{ PROVEEDORES=r; $("ppLista").innerHTML=r.map(p=>`<option value="${String(p[0]).replace(/"/g,"&quot;")}">${[p[1]?"CUIT "+p[1]:"",p[2]||""].filter(Boolean).join(" · ")}</option>`).join(""); }).catch(()=>{});
 let pagosProv=lsGet("cajaPagosProv",[]);
 const guardarPP=()=>{ try{ localStorage.setItem("cajaPagosProv",JSON.stringify(pagosProv)); }catch(e){} };
-function pintarPP(){ $("ppList").innerHTML = pagosProv.slice(-40).reverse().map(x=>`<div><span>${x.fecha} ${x.hora.slice(0,5)} · ${x.prov}${x.comp?" · "+x.comp:""} · ${x.medio} · ${x.caja} ${x.quien?"· "+x.quien:""}</span><b>${fmt(x.monto)}</b></div>`).join("") || '<div style="color:var(--muted)">Todavía no hay pagos.</div>'; }
-$("btnPagProv").addEventListener("click",()=>{ pintarPP(); $("ppModal").hidden=false; $("ppProv").focus(); });
+// Nube: los pagos y cheques se comparten entre cajas y quedan para el control de cheques (colección "pagosProv")
+let DBPP=null; function subirPP(x){ if(DBPP) DBPP.collection("pagosProv").doc(x.id).set(JSON.parse(JSON.stringify(x))).catch(()=>{}); }
+window.claude?.use?.("db").then(db=>{ if(!db) return; DBPP=db; pagosProv.forEach(subirPP);
+  db.collection("pagosProv").onSnapshot(sn=>{ const m=new Map(pagosProv.map(x=>[x.id,x])); sn.docs.forEach(d=>{ const x=d.data(); const y=m.get(x.id); if(!y||(x.ts||0)>(y.ts||0)) m.set(x.id,x); }); pagosProv=[...m.values()].sort((a,b)=>(a.ts||0)-(b.ts||0)); guardarPP(); if(!$("ppModal").hidden){ pintarPP(); pintarCh(); } },()=>{});
+}).catch(()=>{});
+function pintarPP(){ $("ppList").innerHTML = pagosProv.slice(-40).reverse().map(x=>`<div><span>${x.fecha} ${x.hora.slice(0,5)} · ${x.prov}${x.comp?" · "+x.comp:""} · ${x.medio}${x.chN?" N° "+x.chN+" (cobro "+fCorta(x.chF)+")":""} · ${x.caja} ${x.quien?"· "+x.quien:""}</span><b>${fmt(x.monto)}</b></div>`).join("") || '<div style="color:var(--muted)">Todavía no hay pagos.</div>'; }
+const esCh=()=>$("ppMedio").value==="Cheque";
+function verCh(){ document.querySelectorAll(".ppCh").forEach(e=>e.hidden=!esCh()); }
+$("ppMedio").addEventListener("change",verCh);
+const fISO=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const fCorta=iso=>iso?iso.slice(8)+"/"+iso.slice(5,7)+"/"+iso.slice(0,4):"";
+function pintarCh(){
+  const hoyI=fISO(new Date()), en7=fISO(new Date(Date.now()+6*864e5));
+  const pend=pagosProv.filter(x=>x.medio==="Cheque"&&!x.debitado&&!x.borrado).sort((a,b)=>(a.chF||"").localeCompare(b.chF||""));
+  const sum=f=>pend.filter(f).reduce((a,x)=>a+x.monto,0);
+  $("chRes").innerHTML=`<div><b>${fmt(sum(x=>x.chF<hoyI))}</b><span>Vencidos sin debitar</span></div><div><b>${fmt(sum(x=>x.chF===hoyI))}</b><span>Se cobran hoy</span></div><div><b>${fmt(sum(x=>x.chF>=hoyI&&x.chF<=en7))}</b><span>Próximos 7 días</span></div><div><b>${fmt(sum(()=>true))}</b><span>Total pendiente (${pend.length})</span></div>`;
+  $("chList").innerHTML=pend.map(x=>`<div style="${x.chF<hoyI?"color:var(--off);font-weight:700":x.chF===hoyI?"font-weight:700":""}"><span>${fCorta(x.chF)} · Ch. ${x.chN||"?"} · ${x.prov}${x.chB?" · "+x.chB:""}</span><span>${fmt(x.monto)} <button class="btn" type="button" data-deb="${x.id}" style="padding:2px 8px;font-size:12px">Debitado ✓</button></span></div>`).join("")||'<div style="color:var(--muted)">No hay cheques pendientes.</div>';
+}
+$("chList").addEventListener("click",e=>{ const b=e.target.closest("[data-deb]"); if(!b) return; const x=pagosProv.find(y=>y.id===b.dataset.deb); if(!x) return;
+  if(!confirm(`¿Confirmás que el cheque ${x.chN||""} de ${x.prov} por ${fmt(x.monto)} ya se debitó en el banco?`)) return;
+  x.debitado=fISO(new Date()); x.ts=Date.now(); guardarPP(); subirPP(x); pintarCh(); });
+$("btnPagProv").addEventListener("click",()=>{ verCh(); pintarPP(); pintarCh(); $("ppModal").hidden=false; $("ppProv").focus(); });
+$("btnCheques").addEventListener("click",()=>{ verCh(); pintarPP(); pintarCh(); $("ppModal").hidden=false; $("chRes").scrollIntoView(); });
 $("ppX").addEventListener("click",()=>{ $("ppModal").hidden=true; $("scan").focus(); });
 $("ppGuardar").addEventListener("click",()=>{
   const prov=$("ppProv").value.trim(), monto=+$("ppMonto").value||0;
   if(!prov||monto<=0){ aviso("Completá proveedor y monto."); return; }
-  pagosProv.push({id:"PP"+Date.now(), fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien:$("cajero").value, prov, comp:$("ppComp").value.trim(), monto, medio:$("ppMedio").value, obs:$("ppObs").value.trim()});
-  guardarPP(); ["ppProv","ppComp","ppMonto","ppObs"].forEach(i=>$(i).value=""); pintarPP(); aviso("Pago a "+prov+" registrado: "+fmt(monto));
+  const ch=esCh(); if(ch && (!$("ppChN").value.trim()||!$("ppChF").value)){ aviso("En el pago con cheque poné el N° de cheque y la fecha de cobro."); (!$("ppChN").value.trim()?$("ppChN"):$("ppChF")).focus(); return; }
+  const x={id:"PP"+Date.now()+Math.random().toString(36).slice(2,5), fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien:$("cajero").value, prov, comp:$("ppComp").value.trim(), monto, medio:$("ppMedio").value, obs:$("ppObs").value.trim(), ts:Date.now()};
+  if(ch){ x.chN=$("ppChN").value.trim(); x.chF=$("ppChF").value; x.chB=$("ppChB").value.trim(); x.debitado=false; }
+  pagosProv.push(x); guardarPP(); subirPP(x); ["ppProv","ppComp","ppMonto","ppObs","ppChN","ppChF","ppChB"].forEach(i=>$(i).value=""); pintarPP(); pintarCh(); aviso("Pago a "+prov+" registrado: "+fmt(monto)+(ch?" · cheque "+x.chN+" se cobra el "+fCorta(x.chF):""));
 });
 // En el cierre: los pagos en efectivo de la caja de este turno entran solos como gasto
 const _abrirCierrePP=abrirCierre;
