@@ -794,6 +794,9 @@ function leerEtiqueta(t){
   const esBal=p=>p && (balSet.has(p.cod) || p.fv || /FRUTA|VERDUR|FIAMBR|QUESO|CARNE|CARNICER|FRUTOS SECOS|GRANEL|PANADER|ACEITUNA/i.test(p.rubro||""));
   const fmts=[{pf:String(BAL.prefijos).split(/[,\s]+/)[0]||"20",dC:+BAL.dCod,dV:+BAL.dVal,dec:+BAL.dec||0},
     {pf:"20",dC:4,dV:6,dec:2},{pf:"2",dC:5,dV:5,dec:0},{pf:"20",dC:5,dV:5,dec:0},{pf:"2",dC:6,dV:5,dec:0},{pf:"20",dC:4,dV:6,dec:0}];
+  // Etiquetas por unidad de la Cuora: 21 + PLU(5) + importe(5, 2 decimales) + verificador.
+  if (t.startsWith("21")){ const c=sinCeros(t.substr(2,5)), val=+t.substr(7,5)/100, pb=BAL_PLU[c], p=(pb&&porCod.get(pb))||porCod.get("PLU"+c);
+    if (p && val>0) return {p,cod:c,val,score:10}; }
   // PLU 0 = "VARIOS" de la balanza (pan, etc.): se cobra el importe impreso en la etiqueta.
   { const f=fmts[0]; if (t.startsWith(f.pf) && f.pf.length+f.dC+f.dV+1===13 && sinCeros(t.substr(f.pf.length,f.dC))==="0"){
       const val=+t.substr(f.pf.length+f.dC,f.dV)/Math.pow(10,f.dec);
