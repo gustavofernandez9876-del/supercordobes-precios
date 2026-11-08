@@ -688,6 +688,7 @@ function calcLinea(l){
     const inPk=Math.floor(Q/pr.n)*pr.n, share=Q>0?libres*inPk/Q:0;
     desc = share*p.precio*0.05; motivo = inPk>0 ? `5% pack cerrado ${pago} (${pr.txt})` : `pack de ${pr.n}: faltan ${pr.n-(Q%pr.n)}`;
   }
+  else if (pago === "Efectivo" && p.cod==="250V" && l.fijo!=null){ desc = l.fijo*DESC_EFE; motivo="5% efectivo (varios balanza)"; }
   else if (pago === "Efectivo" && p.efe){
     const libres = Math.max(0, q - ofertaUnid - cU);
     if (p.fv){ desc = libres*p.precio*DESC_FV; motivo="20% efectivo FyV"; }
