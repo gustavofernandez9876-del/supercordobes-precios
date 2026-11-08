@@ -769,15 +769,20 @@ function leerEtiqueta(t){
   const esBal=p=>p && (balSet.has(p.cod) || p.fv || /FRUTA|VERDUR|FIAMBR|QUESO|CARNE|CARNICER|FRUTOS SECOS|GRANEL|PANADER|ACEITUNA/i.test(p.rubro||""));
   const fmts=[{pf:String(BAL.prefijos).split(/[,\s]+/)[0]||"20",dC:+BAL.dCod,dV:+BAL.dVal,dec:+BAL.dec||0},
     {pf:"20",dC:4,dV:6,dec:2},{pf:"2",dC:5,dV:5,dec:0},{pf:"20",dC:5,dV:5,dec:0},{pf:"2",dC:6,dV:5,dec:0},{pf:"20",dC:4,dV:6,dec:0}];
+  // PLU 0 = "VARIOS" de la balanza (pan, etc.): se cobra el importe impreso en la etiqueta.
+  { const f=fmts[0]; if (t.startsWith(f.pf) && f.pf.length+f.dC+f.dV+1===13 && sinCeros(t.substr(f.pf.length,f.dC))==="0"){
+      const val=+t.substr(f.pf.length+f.dC,f.dV)/Math.pow(10,f.dec);
+      if (val>0){ const b=porCod.get("250")||{cod:"250",bc:"",plu:"",desc:"PRODUCTOS VARIOS",rubro:"GENERAL",marca:"",empresa:"",precio:0,iva:21,efe:true};
+        return {p:Object.assign({},b,{cod:"250V",desc:"VARIOS (BALANZA)",precio:0,iva:21}),cod:"0",val,score:9}; } } }
   let best=null;
-  for (const f of fmts){
+  for (const [i,f] of fmts.entries()){
     if (!t.startsWith(f.pf) || f.pf.length+f.dC+f.dV+1!==13) continue;
     const cod=t.substr(f.pf.length,f.dC), c=sinCeros(cod), val=+t.substr(f.pf.length+f.dC,f.dV)/Math.pow(10,f.dec);
     const pb=BAL_PLU[c];
     const p=(pb&&porCod.get(pb)) || porCod.get("PLU"+c) || (porMan.get(c)||[]).find(esBal) || null;
     if (!esBal(p) || !(val>0)) continue;
     const kg=p.precio>0? val/p.precio : 1;
-    const score=(pb?2:0)+(kg>=0.005&&kg<=50?3:0)+(kg>=0.05&&kg<=10?1:0);
+    const score=(pb?2:0)+(kg>=0.005&&kg<=50?3:0)+(kg>=0.05&&kg<=10?1:0)+(i===0?1:0);
     if (!best||score>best.score) best={p,cod:c,val,score};
   }
   if (best && best.score>=3) return best;
