@@ -681,14 +681,14 @@ function totalesPago(){
   return t;
 }
 function totales(){
-  let lista=0, oferta=0, efe=0, combo=0;
-  carrito.forEach(l=>{const c=calcLinea(l); lista+=c.lista; oferta+=c.oferta; efe+=c.desc; combo+=c.combo;});
-  const sub = lista-oferta-combo-efe;
+  let lista=0, oferta=0, efe=0, combo=0, recCig=0;
+  carrito.forEach(l=>{const c=calcLinea(l); lista+=c.lista; oferta+=c.oferta; if(c.desc<0) recCig-=c.desc; else efe+=c.desc; combo+=c.combo;});
+  const sub = lista-oferta-combo-efe+recCig;
   const pct = Math.max(0,Math.min(100,+$("adjPct").value||0))/100;
   const ajuste = sub*pct*(+$("adjTipo").value);
   const raw = sub+ajuste, hayDto = efe>0.5 || Math.abs(ajuste)>0.5;
   const total = hayDto ? Math.ceil(Math.round(raw)/100)*100 : raw;
-  return {lista, oferta, efe, combo, ajuste, redondeo: total-raw, total};
+  return {lista, oferta, efe, combo, recCig, ajuste, redondeo: total-raw, total};
 }
 
 // ---------- Catálogo real y buscador
@@ -813,6 +813,8 @@ function render(flash){
     if (c.oferta>0) sub.push(`<span style="color:var(--off)">oferta −${fmt(c.oferta)}</span>`);
     if (c.combo>0) sub.push(`<span class="tag of">COMBO</span> <span style="color:var(--off)">${c.comboU} en combo −${fmt(c.combo)}</span>`);
     if (c.desc>0) sub.push(`<span style="color:var(--accent)">${c.motivo} −${fmt(c.desc)}</span>`);
+    else if (c.desc<0) sub.push(`<span style="color:var(--warn)">${c.motivo} +${fmt(-c.desc)}</span>`);
+    else if (p.cig || /cigarr/i.test(p.rubro||"")) sub.push(`<span>cigarrillos: sin descuento en efectivo</span>`);
     else if (c.manual) sub.push(`<span style="color:var(--warn)">${c.motivo}</span>`);
     else if (!p.efe) sub.push(`<span>no lleva descuento</span>`);
     return `<tr class="${flash===p?'flash':''}"><td><div class="desc">${p.cod==="250"?`PRODUCTOS VARIOS <input id="t${i}" data-det="${i}" value="${(p.desc.replace(/^PRODUCTOS VARIOS( - )?/,"")).replace(/"/g,"&quot;")}" placeholder="detalle (opcional)" aria-label="Detalle" style="width:55%">`:p.desc}${tags}</div><div style="font-size:12px;color:var(--muted)">${p.man&&p.man.length?"<b>"+p.man.join(" / ")+"</b> · ":""}${p.bc||p.cod||("PLU "+p.plu)}${sub.length?" · "+sub.join(" · "):""}</div></td>
@@ -838,6 +840,7 @@ function render(flash){
   $("comboBanner").hidden=!combosAplicados.length;
   $("comboBanner").innerHTML=combosAplicados.map(c=>`<b>¡COMBO DE OFERTA!</b> ${c.nombre}${c.n>1?" ×"+c.n:""} · ${fmt(c.precio)} ${c.efe?"en efectivo":"(5% más que en efectivo)"} · ahorro ${fmt(c.ahorro)}${c.ejemplo?' <small>(precio de ejemplo)</small>':''}`).join("<br>");
   if (t.efe>0) rows.push(`<div class="neg"><span>Descuento efectivo</span><span>−${fmt(t.efe)}</span></div>`);
+  if (t.recCig>0) rows.push(`<div><span>Recargo cigarrillos 10% (no efectivo)</span><span>+${fmt(t.recCig)}</span></div>`);
   if (t.ajuste) rows.push(`<div class="neg"><span>${t.ajuste<0?"Descuento":"Recargo"} especial</span><span>${t.ajuste<0?"−":"+"}${fmt(Math.abs(t.ajuste))}</span></div>`);
   if (t.redondeo>0.5) rows.push(`<div><span>Redondeo</span><span>+${fmt(t.redondeo)}</span></div>`);
   $("tRows").innerHTML = rows.join("");
