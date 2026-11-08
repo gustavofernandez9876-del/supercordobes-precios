@@ -1208,7 +1208,7 @@ async function autorizado(txt){ if (confiable()) return AUTORIZADOS[0]; if (!nor
 const DISP_KEY = "cajaDispositivoGustavo";
 // Cajeros: cada uno con su clave propia (solo la huella). Estas claves NO autorizan cuentas corrientes,
 // notas de crédito ni cambios: eso sigue siendo solo con la clave de Gustavo.
-const CAJEROS = ["Matías","Joaquín","Angela","Angela L","Marcos","Albano"];
+const CAJEROS = ["Matías","Joaquín","Angela","Angela L","Marcos","Albano","Meribet"];
 // Cada cajero elige su propia clave de 5 números o letras la primera vez que entra.
 // Se guarda solo la huella, compartida entre las cajas (sync/cajeros). Gustavo puede borrar una para que la vuelvan a crear.
 let CLAVES = (()=>{ try{ return JSON.parse(localStorage.getItem("cajaClaves")||"{}"); }catch(e){ return {}; } })();
