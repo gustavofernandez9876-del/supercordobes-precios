@@ -206,6 +206,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnNC" type="button">Nota de crédito</button>
     <button class="btn" id="btnFalt" type="button">Productos faltantes</button>
     <button class="btn" id="btnCompA" type="button">Compras Factura A</button>
+    <button class="btn" id="btnPagProv" type="button">Pago a proveedores</button>
     <button class="btn" id="btnVenc" type="button">Vencimientos</button>
     <button class="btn" id="btnVencCel" type="button" onclick="location.hash='#venc';location.reload()">📱 App vencimientos</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
@@ -478,6 +479,23 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
       <p style="margin:6px 0 10px">Este dispositivo es tuyo: no pide clave para productos, descuentos ni notas de crédito.</p>
       <button class="btn" id="dispQuitar" type="button">Dejar de confiar en este dispositivo</button>
     </div>
+  </div>
+</div>
+<div class="modal" id="ppModal" hidden>
+  <div class="ticket ci" role="dialog" aria-labelledby="ppTit" style="max-width:560px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="ppTit">Pago a proveedores</h3><button class="del" id="ppX" type="button" aria-label="Cerrar">×</button></div>
+    <div class="hint" style="margin-bottom:6px">Lo pagado en <b>efectivo de la caja</b> se descuenta solo en el cierre de caja de este turno.</div>
+    <div class="cigrid">
+      <label for="ppProv">Proveedor</label><input id="ppProv" type="text" list="ppLista" autocomplete="off" placeholder="Escribí el nombre">
+      <datalist id="ppLista"></datalist>
+      <label for="ppComp">Factura / remito N°</label><input id="ppComp" type="text" placeholder="Ej. 0004-00274785">
+      <label for="ppMonto">Monto pagado</label><input id="ppMonto" type="number" min="0" step="any" inputmode="decimal">
+      <label for="ppMedio">Cómo se paga</label><select id="ppMedio"><option>Efectivo de la caja</option><option>Transferencia</option><option>Cheque</option><option>Débito</option><option>Efectivo (fuera de la caja)</option></select>
+      <label for="ppObs">Observación</label><input id="ppObs" type="text" placeholder="Opcional (ej. N° de cheque)">
+      <span></span><button class="btn primary" id="ppGuardar" type="button">Registrar pago</button>
+    </div>
+    <div class="label" style="margin-top:12px">Pagos registrados (últimos)</div>
+    <div id="ppList" class="hist num"></div>
   </div>
 </div>
 <div class="modal" id="cpModal" hidden>
@@ -1400,14 +1418,14 @@ function pintarHistCierres(){
   $("ciHist").innerHTML = cierres.slice().reverse().map(c=>{ const d=Object.values(c.diferencia).filter(x=>x!=null).reduce((a,x)=>a+x,0);
     return `<div><span>${c.fecha} ${c.hora.slice(0,5)} · ${c.caja} · ${c.turno} · cerró ${c.quien}</span><b style="color:${Math.abs(d)<1?"var(--accent)":"var(--off)"}">${Math.abs(d)<1?"sin diferencia":(d>0?"sobrante +":"faltante −")+fmt(Math.abs(d))}</b></div>`; }).join("") || '<div style="color:var(--muted)">Todavía no hay cierres.</div>';
 }
-$("btnCierre").addEventListener("click", abrirCierre);
+$("btnCierre").addEventListener("click", ()=>abrirCierre());
 $("ciCerrarX").addEventListener("click", ()=>{ $("ciModal").hidden=true; $("scan").focus(); });
 $("ciModal").addEventListener("input", calcCierre);
 $("ciMovAdd").addEventListener("click", ()=>{ const m=Math.round(+$("ciMovMonto").value||0), k=$("ciMovConc").value.trim();
   if (!k||m<=0){ aviso("Completá concepto y monto del retiro o gasto."); return; }
   ciMovs.push({tipo:$("ciMovTipo").value, concepto:k, monto:m}); $("ciMovConc").value=""; $("ciMovMonto").value=""; pintarMovs(); calcCierre(); });
 $("ciMovs").addEventListener("click", e=>{ const b=e.target.closest("[data-mov]"); if (b){ ciMovs.splice(+b.dataset.mov,1); pintarMovs(); calcCierre(); }});
-$("ciConfirmar").addEventListener("click", confirmarCierre);
+$("ciConfirmar").addEventListener("click", ()=>confirmarCierre());
 
 // ---------- Cliente para factura A
 let CLIENTES_RI=[], faCli=null;
@@ -1721,6 +1739,28 @@ $("movDia").value=diaISO(new Date());
 $("movDia").addEventListener("change",()=>{ ventasNube=[]; movSuscribir($("movDia").value); pintarMov(); });
 $("movQ").addEventListener("input",pintarMov); $("movCaja").addEventListener("change",pintarMov);
 pintarNube();
+
+// ===== Pago a proveedores =====
+let PROVEEDORES=[]; fetch("proveedores.json").then(r=>r.ok?r.json():[]).then(r=>{ PROVEEDORES=r; $("ppLista").innerHTML=r.map(p=>`<option value="${String(p[0]).replace(/"/g,"&quot;")}">`).join(""); }).catch(()=>{});
+let pagosProv=lsGet("cajaPagosProv",[]);
+const guardarPP=()=>{ try{ localStorage.setItem("cajaPagosProv",JSON.stringify(pagosProv)); }catch(e){} };
+function pintarPP(){ $("ppList").innerHTML = pagosProv.slice(-40).reverse().map(x=>`<div><span>${x.fecha} ${x.hora.slice(0,5)} · ${x.prov}${x.comp?" · "+x.comp:""} · ${x.medio} · ${x.caja} ${x.quien?"· "+x.quien:""}</span><b>${fmt(x.monto)}</b></div>`).join("") || '<div style="color:var(--muted)">Todavía no hay pagos.</div>'; }
+$("btnPagProv").addEventListener("click",()=>{ pintarPP(); $("ppModal").hidden=false; $("ppProv").focus(); });
+$("ppX").addEventListener("click",()=>{ $("ppModal").hidden=true; $("scan").focus(); });
+$("ppGuardar").addEventListener("click",()=>{
+  const prov=$("ppProv").value.trim(), monto=+$("ppMonto").value||0;
+  if(!prov||monto<=0){ aviso("Completá proveedor y monto."); return; }
+  pagosProv.push({id:"PP"+Date.now(), fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien:$("cajero").value, prov, comp:$("ppComp").value.trim(), monto, medio:$("ppMedio").value, obs:$("ppObs").value.trim()});
+  guardarPP(); ["ppProv","ppComp","ppMonto","ppObs"].forEach(i=>$(i).value=""); pintarPP(); aviso("Pago a "+prov+" registrado: "+fmt(monto));
+});
+// En el cierre: los pagos en efectivo de la caja de este turno entran solos como gasto
+const _abrirCierrePP=abrirCierre;
+abrirCierre=function(){ _abrirCierrePP();
+  pagosProv.filter(x=>!x.cierre && x.medio==="Efectivo de la caja" && x.caja===$("caja").value && x.turno===$("turno").value && x.fecha===hoy())
+    .forEach(x=>{ if(!ciMovs.some(m=>m.pp===x.id)) ciMovs.push({tipo:"Gasto",concepto:"Pago a "+x.prov+(x.comp?" ("+x.comp+")":""),monto:x.monto,pp:x.id}); });
+  pintarMovs(); calcCierre(); };
+const _confirmarCierrePP=confirmarCierre;
+confirmarCierre=function(){ const n=cierres.length; _confirmarCierrePP(); if(cierres.length>n){ const id=cierres[cierres.length-1].id; ciMovs.forEach(m=>{ const x=pagosProv.find(p=>p.id===m.pp); if(x) x.cierre=id; }); cierres[cierres.length-1].movimientos.forEach(m=>{ const x=pagosProv.find(p=>p.id===m.pp); if(x) x.cierre=id; }); guardarPP(); } };
 </script>
 
 
