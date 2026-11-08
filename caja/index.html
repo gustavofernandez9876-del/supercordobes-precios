@@ -1422,17 +1422,17 @@ const idCli=c=>c.cuit?("CUIT "+fmtCuit(c.cuit)):c.doc?("DNI "+c.doc):"sin docume
 function pintarFA(esA, bGrande){
   faModoA=esA;
   $("faTit").textContent = esA ? "Cliente de la factura A (obligatorio)" : bGrande ? "Cliente de la factura B (obligatorio: supera $10.000.000)" : "Cliente de la factura B (opcional, si no va a consumidor final)";
-  if (faCli){ $("faSel").innerHTML=`<div class="facard"><span><b>${faCli.razon}</b><br><small>${idCli(faCli)} · ${faCli.cond}${faCli.dom?" · "+faCli.dom:""}</small></span><button class="btn" type="button" id="faCambiar">Quitar</button></div>`+deudaHTML(ccPorCli(faCli)); $("faBuscar").hidden=true; }
+  if (faCli){ $("faSel").innerHTML=`<div class="facard"><span><b>${faCli.razon}</b><br><small>${idCli(faCli)} · ${faCli.cond||"condición IVA sin cargar"}${faCli.dom?" · "+faCli.dom:""}</small></span><button class="btn" type="button" id="faCambiar">Quitar</button></div>`+deudaHTML(ccPorCli(faCli)); $("faBuscar").hidden=true; }
   else { $("faSel").innerHTML = esA ? '<div class="est warn">Para emitir factura A hay que elegir el cliente.</div>'
       : bGrande ? '<div class="est warn">Supera $10.000.000: hay que identificar al comprador con DNI o CUIT.</div>' : '<div class="hint">Sin cliente: sale “A CONSUMIDOR FINAL”.</div>';
     $("faBuscar").hidden=false; buscarFA(); }
 }
 function buscarFA(){
   const t=norm($("faBus").value.trim()), d=t.replace(/\D/g,"");
-  const base = faModoA ? CLIENTES_RI.filter(c=>c.cond==="IVA Responsable Inscripto") : CLIENTES_RI;
+  const base = faModoA ? CLIENTES_RI.filter(c=>c.cond==="IVA Responsable Inscripto" || (!c.cond && (c.cuit||"").replace(/\D/g,"").length===11)) : CLIENTES_RI;
   if (t.length<2){ $("faRes").innerHTML=`<div class="hint">${base.length} clientes cargados${faModoA?" (Responsables Inscriptos)":""}. Escribí parte del nombre, CUIT o DNI.</div>`; return; }
   const hits=base.filter(c=>norm(c.razon).includes(t) || (d.length>=3 && ((c.cuit||"").includes(d) || (c.doc||"").includes(d)))).slice(0,30);
-  $("faRes").innerHTML = hits.length ? hits.map(c=>`<button type="button" data-cod="${c.cod}"><b>${c.razon}</b><br><small>${idCli(c)} · ${c.cond}${c.dom?" · "+c.dom:""}${c.cuit&&!cuitValido(c.cuit)?" · ⚠ CUIT inválido, revisar":""}</small></button>`).join("")
+  $("faRes").innerHTML = hits.length ? hits.map(c=>`<button type="button" data-cod="${c.cod}"><b>${c.razon}</b><br><small>${idCli(c)} · ${c.cond||"condición IVA sin cargar"}${c.dom?" · "+c.dom:""}${c.cuit&&!cuitValido(c.cuit)?" · ⚠ CUIT inválido, revisar":""}</small></button>`).join("")
     : '<div class="hint">No está cargado. Usá “+ Cliente nuevo”.</div>';
 }
 $("faBus").addEventListener("input", buscarFA);
