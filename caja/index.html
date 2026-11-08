@@ -1741,7 +1741,7 @@ $("movQ").addEventListener("input",pintarMov); $("movCaja").addEventListener("ch
 pintarNube();
 
 // ===== Pago a proveedores =====
-let PROVEEDORES=[]; fetch("proveedores.json").then(r=>r.ok?r.json():[]).then(r=>{ PROVEEDORES=r; $("ppLista").innerHTML=r.map(p=>`<option value="${String(p[0]).replace(/"/g,"&quot;")}">`).join(""); }).catch(()=>{});
+let PROVEEDORES=[]; fetch("proveedores.json").then(r=>r.ok?r.json():[]).then(r=>{ PROVEEDORES=r; $("ppLista").innerHTML=r.map(p=>`<option value="${String(p[0]).replace(/"/g,"&quot;")}">${[p[1]?"CUIT "+p[1]:"",p[2]||""].filter(Boolean).join(" · ")}</option>`).join(""); }).catch(()=>{});
 let pagosProv=lsGet("cajaPagosProv",[]);
 const guardarPP=()=>{ try{ localStorage.setItem("cajaPagosProv",JSON.stringify(pagosProv)); }catch(e){} };
 function pintarPP(){ $("ppList").innerHTML = pagosProv.slice(-40).reverse().map(x=>`<div><span>${x.fecha} ${x.hora.slice(0,5)} · ${x.prov}${x.comp?" · "+x.comp:""} · ${x.medio} · ${x.caja} ${x.quien?"· "+x.quien:""}</span><b>${fmt(x.monto)}</b></div>`).join("") || '<div style="color:var(--muted)">Todavía no hay pagos.</div>'; }
