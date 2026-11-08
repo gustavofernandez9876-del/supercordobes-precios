@@ -630,6 +630,12 @@ function calcLinea(l){
   const cU = l.comboU||0, cD = l.comboD||0;
   bruto -= cD;
   let desc = 0, motivo = "";
+  const esCig = p.cig || /cigarr|tabaco/i.test(p.rubro||"");
+  if (esCig){
+    // Cigarrillos: NUNCA llevan descuento (ni efectivo, ni pack, ni individual). Otros medios: +10%.
+    if (pago !== "Efectivo"){ desc = -bruto*0.10; motivo = "+10% recargo cigarrillos (no efectivo)"; }
+    return {lista, oferta: Math.max(0, Math.round(lista-bruto-cD)), combo:cD, comboU:cU, desc, neto: bruto-desc, motivo, enOferta: ofertaUnid>0, cig:true};
+  }
   if (l.dto !== undefined && l.dto !== null){
     // Descuento individual del renglón: reemplaza al automático, sea cual sea la forma de pago.
     desc = bruto*l.dto/100; motivo = l.dto>0 ? `dto. ${l.dto}% individual` : "sin descuento (individual)";
@@ -682,10 +688,11 @@ function totalesPago(){
 }
 function totales(){
   let lista=0, oferta=0, efe=0, combo=0, recCig=0;
-  carrito.forEach(l=>{const c=calcLinea(l); lista+=c.lista; oferta+=c.oferta; if(c.desc<0) recCig-=c.desc; else efe+=c.desc; combo+=c.combo;});
+  let subCig=0;
+  carrito.forEach(l=>{const c=calcLinea(l); lista+=c.lista; oferta+=c.oferta; if(c.desc<0) recCig-=c.desc; else efe+=c.desc; combo+=c.combo; if(c.cig) subCig+=c.neto;});
   const sub = lista-oferta-combo-efe+recCig;
-  const pct = Math.max(0,Math.min(100,+$("adjPct").value||0))/100;
-  const ajuste = sub*pct*(+$("adjTipo").value);
+  const pct = Math.max(0,Math.min(100,+$("adjPct").value||0))/100, tipo=+$("adjTipo").value;
+  const ajuste = (tipo<0 ? sub-subCig : sub)*pct*tipo; // el descuento especial no alcanza a los cigarrillos
   const raw = sub+ajuste, hayDto = efe>0.5 || Math.abs(ajuste)>0.5;
   const total = hayDto ? Math.ceil(Math.round(raw)/100)*100 : raw;
   return {lista, oferta, efe, combo, recCig, ajuste, redondeo: total-raw, total};
