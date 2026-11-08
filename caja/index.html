@@ -751,7 +751,6 @@ fetch("productos.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(ro
   PRODUCTOS = rows.map(([cod,bc,desc,rubro,marca,precio,fl,empresa,iva])=>({cod,bc,plu:"",desc,rubro,marca,empresa:empresa||"",precio,iva:(iva===""||iva==null)?null:+iva,efe:!fl.includes("n"),fv:fl.includes("f"),cig:/CIGARR|TABACO/i.test(rubro||"")})).map(p=>{ if(p.cig) p.efe=false; return p; });
   catalogoReal=true; aplicarEditsProd(); indexar();
   carrito=[]; ultimo=null;
-  ["6*7790742625502","7793704000928","1.25*11408"].forEach(c=>agregar(c));
   render(); $("catInfo").textContent="Catálogo real: "+PRODUCTOS.length.toLocaleString("es-AR")+" productos (precios actualizados al 04/11/2026)";
 }).catch(()=>{ $("catInfo").textContent="Sin catálogo real: usando productos de ejemplo"; });
 // ===== Etiquetas de la balanza Cuora Neo =====
