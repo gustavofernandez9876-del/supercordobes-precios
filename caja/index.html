@@ -1426,12 +1426,38 @@ function confirmarCierre(){
     ${["Efectivo",...MEDIOS_DECL].map(fila).join("")}
     <div class="tl num"><span>Vendido a cuenta corriente</span><span>${fmt(c.ventaCuentaCorriente)}</span></div>
     ${c.obs?`<div class="tl"><span>Observaciones</span><span>${c.obs}</span></div>`:""}
-    <button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:14px">Volver a la caja</button>`;
-  $("modal").hidden=false; render();
+    <button class="btn" id="btnImpCierre" type="button" style="width:100%;margin-top:14px">🖨 Imprimir cierre</button>
+    <button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:8px">Volver a la caja</button>`;
+  $("btnImpCierre").addEventListener("click", ()=>imprimirCierre(c));
+  $("modal").hidden=false; render(); imprimirCierre(c);
+}
+function imprimirCierre(c){
+  const esc=s=>String(s??"").replace(/[&<>]/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[x]));
+  const sg=d=>d==null?"—":(d>0?"+":d<0?"−":"")+fmt(Math.abs(d));
+  const fila=m=>`<div class="r"><span>${m}</span><span>${fmt(c.sistema[m]||0)}</span></div><div class="r s"><span>declarado ${c.declarado[m]==null?"—":fmt(c.declarado[m])}</span><span>dif ${sg(c.diferencia[m])}</span></div>`;
+  const bill=Object.entries(c.billetes||{}).sort((a,b)=>b[0]-a[0]).map(([b,n])=>`<div class="r s"><span>${n} × $${(+b).toLocaleString("es-AR")}</span><span>${fmt(n*b)}</span></div>`).join("")+(c.monedas?`<div class="r s"><span>Monedas</span><span>${fmt(c.monedas)}</span></div>`:"");
+  const h=`<html><head><meta charset="utf-8"><style>@page{size:58mm auto;margin:0}body{font-family:Arial,sans-serif;font-size:11px;width:44mm;margin:0 0 0 1mm;overflow-wrap:anywhere}
+  .c{text-align:center}.r{display:flex;justify-content:space-between;gap:4px}.s{font-size:10px}.t{font-size:14px;font-weight:bold}hr{border:0;border-top:1px dashed #000}</style></head><body>
+  <div class="c t">SUPERCORDOBES</div><div class="c">CIERRE DE CAJA</div><hr>
+  <div>${esc(c.caja)} · turno ${esc(c.turno)}</div><div>${esc(c.fecha)} ${esc(c.hora)}</div>
+  <div>Cerró: ${esc(c.quien)}</div><div>Responsable: ${esc(c.responsable)}</div><hr>
+  <div class="r"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""}</span></div>
+  <div class="r"><span>Total vendido</span><span>${fmt(c.totalComprobantes)}</span></div>
+  <div class="r"><span>Fondo inicial</span><span>${fmt(c.fondo)}</span></div>
+  ${(c.movimientos||[]).map(x=>`<div class="r s"><span>${esc(x.tipo)}: ${esc(x.concepto)}</span><span>−${fmt(x.monto)}</span></div>`).join("")}<hr>
+  <div><b>Sistema / declarado / diferencia</b></div>${["Efectivo",...MEDIOS_DECL].map(fila).join("")}
+  <div class="r"><span>Cuenta corriente</span><span>${fmt(c.ventaCuentaCorriente||0)}</span></div><hr>
+  ${bill?`<div><b>Conteo de efectivo</b></div>${bill}<hr>`:""}
+  ${c.obs?`<div>Obs: ${esc(c.obs)}</div><hr>`:""}
+  <br><div>Firma: ____________________</div><br></body></html>`;
+  let f=document.getElementById("printFrame"); if(f) f.remove();
+  f=document.createElement("iframe"); f.id="printFrame"; f.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0";
+  document.body.appendChild(f); f.contentDocument.open(); f.contentDocument.write(h); f.contentDocument.close();
+  setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ aviso("No se pudo imprimir"); } },150);
 }
 function pintarHistCierres(){
   $("ciHist").innerHTML = cierres.slice().reverse().map(c=>{ const d=Object.values(c.diferencia).filter(x=>x!=null).reduce((a,x)=>a+x,0);
-    return `<div><span>${c.fecha} ${c.hora.slice(0,5)} · ${c.caja} · ${c.turno} · cerró ${c.quien}</span><b style="color:${Math.abs(d)<1?"var(--accent)":"var(--off)"}">${Math.abs(d)<1?"sin diferencia":(d>0?"sobrante +":"faltante −")+fmt(Math.abs(d))}</b></div>`; }).join("") || '<div style="color:var(--muted)">Todavía no hay cierres.</div>';
+    return `<div><span>${c.fecha} ${c.hora.slice(0,5)} · ${c.caja} · ${c.turno} · cerró ${c.quien}</span><b style="color:${Math.abs(d)<1?"var(--accent)":"var(--off)"}">${Math.abs(d)<1?"sin diferencia":(d>0?"sobrante +":"faltante −")+fmt(Math.abs(d))}</b> <button class="btn" type="button" data-impc="${c.id}" style="padding:2px 8px">🖨</button></div>`; }).join("") || '<div style="color:var(--muted)">Todavía no hay cierres.</div>';
 }
 $("btnCierre").addEventListener("click", ()=>abrirCierre());
 $("ciCerrarX").addEventListener("click", ()=>{ $("ciModal").hidden=true; $("scan").focus(); });
@@ -1441,6 +1467,7 @@ $("ciMovAdd").addEventListener("click", ()=>{ const m=Math.round(+$("ciMovMonto"
   ciMovs.push({tipo:$("ciMovTipo").value, concepto:k, monto:m}); $("ciMovConc").value=""; $("ciMovMonto").value=""; pintarMovs(); calcCierre(); });
 $("ciMovs").addEventListener("click", e=>{ const b=e.target.closest("[data-mov]"); if (b){ ciMovs.splice(+b.dataset.mov,1); pintarMovs(); calcCierre(); }});
 $("ciConfirmar").addEventListener("click", ()=>confirmarCierre());
+$("ciHist").addEventListener("click", e=>{ const b=e.target.closest("[data-impc]"); if (b){ const c=cierres.find(x=>x.id===b.dataset.impc); if (c) imprimirCierre(c); }});
 
 // ---------- Cliente para factura A
 let CLIENTES_RI=[], faCli=null;
