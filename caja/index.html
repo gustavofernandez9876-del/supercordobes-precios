@@ -1401,9 +1401,11 @@ function sistemaCaja(){
   ["Efectivo",...MEDIOS_DECL,"Cuenta corriente"].forEach(m=>{ s[m]=vs.reduce((a,v)=>a+(v.pagos?v.pagos.filter(p=>p.medio===m).reduce((x,p)=>x+p.monto,0):(v.pago===m?v.total:0)),0)+cs.filter(c=>c.medio===m).reduce((a,c)=>a+c.monto,0); });
   return s;
 }
+function porComp(vs){ const m={"Factura B":0,"Factura A":0,"Remito interno":0}; let nc=0; vs.forEach(v=>{ if(v.nc){ nc+=v.total; return; } m[v.comp]=(m[v.comp]||0)+v.total; }); return {m,nc,total:Object.values(m).reduce((a,x)=>a+x,0)-nc}; }
+function htmlPorComp(pc){ return `<div class="label" style="margin-top:10px">Ventas del turno por comprobante</div>`+Object.keys(pc.m).map(k=>`<div class="tl num"><span>${k}</span><span>${fmt(pc.m[k])}</span></div>`).join("")+(pc.nc?`<div class="tl num"><span>Notas de crédito / devoluciones</span><span>−${fmt(pc.nc)}</span></div>`:"")+`<div class="tl num" style="font-weight:700"><span>TOTAL VENDIDO (facturas + remitos)</span><span>${fmt(pc.total)}</span></div>`; }
 function abrirCierre(){
   ciMovs=[]; $("ciQuien").value=$("cajero").value; $("ciFondo").value=$("ciFondo").value||"";
-  $("ciCab").textContent=`${$("caja").value} · turno ${$("turno").value} · ${hoy()} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`;
+  $("ciCab").innerHTML=`${$("caja").value} · turno ${$("turno").value} · ${hoy()} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`+htmlPorComp(porComp(abiertas()));
   $("ciBill").innerHTML=BILLETES.map(b=>`<label for="ciB${b}"><b>$${b.toLocaleString("es-AR")}</b><i aria-hidden="true">×</i><input id="ciB${b}" type="number" min="0" step="1" inputmode="numeric" data-b="${b}"><span id="ciBt${b}">$ 0</span></label>`).join("")+
     `<label for="ciMon"><b>Monedas</b><i aria-hidden="true">$</i><input id="ciMon" type="number" min="0" step="10" inputmode="numeric"><span></span></label>`;
   $("ciArq").innerHTML=`<span class="h">Medio</span><span class="h">Según sistema</span><span class="h">Declarado</span><span class="h">Diferencia</span>`+
@@ -1439,7 +1441,7 @@ function confirmarCierre(){
   const billetes={}; BILLETES.forEach(b=>{ const n=+$("ciB"+b).value||0; if(n) billetes[b]=n; });
   const c={id, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien, responsable:$("cajero").value, fondo:r.fondo, movimientos:ciMovs.slice(),
     billetes, monedas:+$("ciMon").value||0, sistema:r.sis, declarado:r.dec, diferencia:r.dif, ventaCuentaCorriente:r.cc,
-    comprobantes:vs.length, notasCredito:vs.filter(v=>v.nc).length, totalComprobantes:vs.reduce((a,v)=>a+v.total,0), obs:$("ciObs").value.trim()};
+    comprobantes:vs.length, notasCredito:vs.filter(v=>v.nc).length, totalComprobantes:porComp(vs).total, porComp:porComp(vs), obs:$("ciObs").value.trim()};
   vs.forEach(v=>v.cierre=id); cs.forEach(x=>x.cierre=id); cierres.push(c);
   guardar(); try { localStorage.setItem("cajaCobrosCC",JSON.stringify(cobros)); localStorage.setItem("cajaCierres",JSON.stringify(cierres)); } catch(e) {}
   $("ciModal").hidden=true; $("ciObs").value="";
@@ -1447,6 +1449,7 @@ function confirmarCierre(){
   $("ticket").innerHTML=`<h3>Caja cerrada</h3><div style="color:var(--muted)">${c.caja} · turno ${c.turno} · ${c.fecha} ${c.hora}</div><hr>
     <div class="tl"><span>Cerró</span><b>${c.quien}</b></div><div class="tl"><span>Responsable del turno</span><span>${c.responsable}</span></div>
     <div class="tl num"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""} · ${fmt(c.totalComprobantes)}</span></div><hr>
+    ${c.porComp?htmlPorComp(c.porComp)+"<hr>":""}
     <div class="tl num"><span>Fondo inicial</span><span>${fmt(c.fondo)}</span></div>
     ${c.movimientos.map(x=>`<div class="tl num"><span>${x.tipo}: ${x.concepto}</span><span>−${fmt(x.monto)}</span></div>`).join("")}
     <div class="label" style="margin-top:8px">Sistema → declarado · diferencia</div>
@@ -1469,7 +1472,8 @@ function imprimirCierre(c){
   <div>${esc(c.caja)} · turno ${esc(c.turno)}</div><div>${esc(c.fecha)} ${esc(c.hora)}</div>
   <div>Cerró: ${esc(c.quien)}</div><div>Responsable: ${esc(c.responsable)}</div><hr>
   <div class="r"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""}</span></div>
-  <div class="r"><span>Total vendido</span><span>${fmt(c.totalComprobantes)}</span></div>
+  ${c.porComp?Object.keys(c.porComp.m).map(k=>`<div class="r s"><span>${k}</span><span>${fmt(c.porComp.m[k])}</span></div>`).join("")+(c.porComp.nc?`<div class="r s"><span>Notas de crédito</span><span>−${fmt(c.porComp.nc)}</span></div>`:""):""}
+  <div class="r"><b>Total vendido (fact.+remitos)</b><b>${fmt(c.totalComprobantes)}</b></div>
   <div class="r"><span>Fondo inicial</span><span>${fmt(c.fondo)}</span></div>
   ${(c.movimientos||[]).map(x=>`<div class="r s"><span>${esc(x.tipo)}: ${esc(x.concepto)}</span><span>−${fmt(x.monto)}</span></div>`).join("")}<hr>
   <div><b>Sistema / declarado / diferencia</b></div>${["Efectivo",...MEDIOS_DECL].map(fila).join("")}
