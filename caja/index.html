@@ -587,9 +587,9 @@ let PRODUCTOS = [
 ];
 // Combos de oferta: se aplican solos al pasar los productos, aunque el cajero no haga nada.
 // Cada componente acepta cualquiera de sus códigos internos (ej. Coca común o sin azúcar).
-// Precio del combo definido por Gustavo (16/10/2026): $22.500 en efectivo; con débito, crédito, QR, transferencia o cuenta corriente lleva 5% más ($23.625).
+// Precio del combo según cartel (09/11/2026): $23.300 en efectivo; con débito, crédito, QR, transferencia o cuenta corriente $24.500.
 const COMBOS = [
-  {id:"FERNET-COCA", nombre:"Fernet 750 + Coca-Cola 2,25 L", precio:22500, recargoNoEfe:0.05, ejemplo:false,
+  {id:"FERNET-COCA", nombre:"Fernet 750 + Coca-Cola 2,25 L", precio:23300, precioLista:24500, ejemplo:false,
    componentes:[{nombre:"Fernet 750", codigos:["4492","341298"], cant:1},{nombre:"Coca-Cola 2,25 L", codigos:["3127","3126"], cant:1}]},
 ];
 let combosAplicados = [];
@@ -604,7 +604,7 @@ function aplicarCombos(){
     let lista=0; const usadas=[];
     cb.componentes.forEach((c,i)=>{ let falta=n*c.cant;
       lineas[i].slice().sort((a,b)=>b.p.precio-a.p.precio).forEach(l=>{ const toma=Math.min(falta, Math.floor(l.q-l.comboU)); if (toma>0){ l.comboU+=toma; falta-=toma; lista+=toma*l.p.precio; usadas.push([l,toma*l.p.precio]); } }); });
-    const pu = pago==="Efectivo" ? cb.precio : Math.round(cb.precio*(1+(cb.recargoNoEfe||0)));
+    const pu = pago==="Efectivo" ? cb.precio : (cb.precioLista || Math.round(cb.precio*(1+(cb.recargoNoEfe||0))));
     const ahorro=Math.max(0, lista-n*pu);
     usadas.forEach(([l,imp])=>{ l.comboD += lista>0 ? ahorro*imp/lista : 0; });
     combosAplicados.push({nombre:cb.nombre, n, ahorro, precio:pu, efe:pago==="Efectivo", ejemplo:cb.ejemplo});
@@ -904,7 +904,7 @@ function render(flash){
   if (t.oferta>0) rows.push(`<div class="neg"><span>Ofertas por cantidad</span><span>−${fmt(t.oferta)}</span></div>`);
   if (t.combo>0) rows.push(`<div class="neg"><span>Combos de oferta</span><span>−${fmt(t.combo)}</span></div>`);
   $("comboBanner").hidden=!combosAplicados.length;
-  $("comboBanner").innerHTML=combosAplicados.map(c=>`<b>¡COMBO DE OFERTA!</b> ${c.nombre}${c.n>1?" ×"+c.n:""} · ${fmt(c.precio)} ${c.efe?"en efectivo":"(5% más que en efectivo)"} · ahorro ${fmt(c.ahorro)}${c.ejemplo?' <small>(precio de ejemplo)</small>':''}`).join("<br>");
+  $("comboBanner").innerHTML=combosAplicados.map(c=>`<b>¡COMBO DE OFERTA!</b> ${c.nombre}${c.n>1?" ×"+c.n:""} · ${fmt(c.precio)} ${c.efe?"en efectivo":"(precio de lista; en efectivo es menos)"} · ahorro ${fmt(c.ahorro)}${c.ejemplo?' <small>(precio de ejemplo)</small>':''}`).join("<br>");
   if (t.efe>0) rows.push(`<div class="neg"><span>Descuento efectivo</span><span>−${fmt(t.efe)}</span></div>`);
   if (t.recCig>0) rows.push(`<div><span>Recargo cigarrillos 10% (no efectivo)</span><span>+${fmt(t.recCig)}</span></div>`);
   if (t.ajuste) rows.push(`<div class="neg"><span>${t.ajuste<0?"Descuento":"Recargo"} especial</span><span>${t.ajuste<0?"−":"+"}${fmt(Math.abs(t.ajuste))}</span></div>`);
