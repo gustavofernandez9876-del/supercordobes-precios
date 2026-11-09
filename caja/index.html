@@ -840,6 +840,11 @@ function agregar(texto){
     const p=Object.assign({},base,{desc:"PRODUCTOS VARIOS",precio:0});
     carrito.push({p,q}); ultimo=p; render(p); $("scan").value=""; setTimeout(()=>{const x=$("p"+(carrito.length-1)); if(x){x.focus();x.select();}},0); return true;
   }
+  if (/^(DEV(OLUCION|OLUCIÓN)?\.?\s*|-\s*)?ENVASES?$/i.test(t)){   // Envase: se cobra $5.000 si no trae el envase; "devolucion envase" reintegra $5.000. Sin descuentos.
+    const dev=/^(DEV|-)/i.test(t);
+    const p={cod:dev?"ENVDEV":"ENVASE",bc:"",plu:"",desc:dev?"DEVOLUCION ENVASE":"ENVASE (DEPOSITO)",rubro:"ENVASES",marca:"",empresa:"",precio:dev?-5000:5000,iva:0,efe:false,sinDto:true};
+    carrito.push({p,q}); ultimo=p; render(p); $("scan").value=""; return true;
+  }
   if (/^RECARGAS?$/i.test(t)){   // Recarga (celular/SUBE): importe a mano, sin descuentos ni recargos
     const p={cod:"RECARGA",bc:"",plu:"",desc:"RECARGA",rubro:"RECARGAS",marca:"",empresa:"",precio:0,iva:0,efe:false,sinDto:true};
     carrito.push({p,q:1}); ultimo=p; render(p); $("scan").value=""; setTimeout(()=>{const x=$("p"+(carrito.length-1)); if(x){x.focus();x.select();}},0); return true;
