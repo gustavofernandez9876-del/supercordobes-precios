@@ -1106,7 +1106,7 @@ function cobrar(){
   }
   const v = {nro:nro++, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, cajero:$("cajero").value.trim()||"Sin nombre",
     pago: t.split ? t.split.map(x=>x.medio).join(" + ") : pago, pagos: t.split ? t.split.map(x=>({medio:x.medio, monto:Math.round(x.monto)})) : null, comp, total:Math.round(t.total), ajusteMotivo: t.ajuste ? $("adjMot").value : "", cliente: cliCC ? cliCC.nombre : "", clienteFA: (comp==="Factura A"||comp==="Factura B") && faCli ? {...faCli} : null,
-    items: carrito.map(l=>({cod:l.p.cod, desc:l.p.desc, q:l.q, importe:Math.round(calcLinea(l).neto)}))};
+    items: carrito.map(l=>({cod:l.p.cod, desc:l.p.desc, q:l.q, importe:Math.round(calcLinea(l).neto), lista:Math.round(calcLinea(l).lista), ...(l.dto!=null?{dto:l.dto}:{})}))};
   ventas.push(v); guardar();
   $("ticket").innerHTML = `<h3>Venta #${v.nro}</h3><div style="color:var(--muted)">${v.fecha} ${v.hora} · ${v.caja} · ${v.cajero}</div><hr>`+
     v.items.map(i=>`<div class="tl num"><span>${i.q} ${i.desc}</span><span>${fmt(i.importe)}</span></div>`).join("")+
@@ -1754,8 +1754,23 @@ window.claude?.use?.("db").then(d=>{ if(!d) { pintarNube(); return; } NUBE=d; su
 let movUnsub=null, movCobUnsub=null, movCobros=[], movDia="";
 function movSuscribir(dia){ if(!NUBE) return; movDia=dia; movUnsub&&movUnsub(); movCobUnsub&&movCobUnsub();
   movUnsub=NUBE.collection(`dias/${dia}/ventas`).onSnapshot(s=>{ ventasNube=s.docs.map(x=>x.data()); if(dia===diaISO(new Date())) window.__vn=ventasNube; if(dia===diaISO(new Date())) render(); pintarMov(); }, ()=>{});
-  movCobUnsub=NUBE.collection(`dias/${dia}/cobros`).onSnapshot(s=>{ movCobros=s.docs.map(x=>x.data()); pintarMov(); }, ()=>{}); }
+  movCobUnsub=NUBE.collection(`dias/${dia}/cobros`).onSnapshot(s=>{ movCobros=s.docs.map(x=>x.data()); pintarMov(); }, ()=>{});
+  try{ window.__movAlU&&window.__movAlU(); const [y,m,d]=dia.split("-"); const dd=(+d)+"/"+(+m)+"/"+y; window.__movAlU=NUBE.collection("alertas").onSnapshot(s=>{ movAlertas=s.docs.map(x=>x.data()).filter(a=>a.dia===dd); pintarMov(); },()=>{}); }catch(e){} }
 function partes(v){ return v.pagos&&v.pagos.length ? v.pagos : [{medio:v.pago, monto:v.total}]; }
+let movAlertas=[];
+function porCaja(vs){ const m={}; vs.forEach(v=>{ const k=v.caja||"?"; const x=m[k]=m[k]||{tot:0,n:0,ult:"",caj:new Set(),med:{}}; const sg=v.nc?-1:1; x.tot+=sg*v.total; x.n++; if((v.hora||"")>x.ult) x.ult=v.hora||""; x.caj.add(v.cajero); partes(v).forEach(p=>x.med[p.medio]=(x.med[p.medio]||0)+sg*p.monto); });
+  const ks=Object.keys(m).sort(); if(!ks.length) return "";
+  return `<h3 style="margin:14px 0 6px">Por caja</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">${ks.map(k=>{const x=m[k]; return `<div class="panel" style="padding:10px"><div class="label">${escH(k)} · ${escH([...x.caj].join(", "))}</div><b class="num" style="font-size:20px">${fmt(x.tot)}</b><div class="hint">${x.n} comprobantes · último ${escH(x.ult.slice(0,5))}</div><div class="hint">${Object.keys(x.med).map(md=>escH(md)+" "+fmt(x.med[md])).join(" · ")}</div></div>`;}).join("")}</div>`; }
+function revisar(vs){ const r=[];
+  vs.forEach(v=>{ const id=`${escH((v.hora||"").slice(0,5))} · ${escH(v.caja)} · ${escH(v.cajero)} · #${v.nro}`;
+    if(v.nc) r.push([v.ts||0,`<b style="color:var(--off)">Nota de crédito / devolución</b> ${fmt(v.total)}`,id]);
+    if(v.ajusteMotivo) r.push([v.ts||0,`Ajuste especial: ${escH(v.ajusteMotivo)}`,id]);
+    (v.items||[]).forEach(i=>{ if(i.dto!=null && i.dto!==0) r.push([v.ts||0,`Descuento a mano ${i.dto}% en ${escH(i.desc)} (${fmt(i.importe)})`,id]);
+      if(i.cod==="250V" && i.importe>=50000) r.push([v.ts||0,`Varios de balanza alto: ${fmt(i.importe)}`,id]); });
+    if(!(v.total>0) && !v.nc) r.push([v.ts||0,`Venta en $0 o negativa (${fmt(v.total)})`,id]); });
+  movAlertas.forEach(a=>r.push([Date.parse(a.fecha)||0,`<b style="color:var(--off)">Clave incorrecta:</b> ${escH(a.accion)}`,`${escH((a.hora||"").slice(0,5))} · ${escH(a.caja)} · ${escH(a.responsable)}`]));
+  r.sort((a,b)=>b[0]-a[0]);
+  return `<h3 style="margin:14px 0 6px">Para revisar ${r.length?`<span style="color:var(--off)">(${r.length})</span>`:""}</h3>`+(r.length?`<div class="tablewrap"><table class="lt"><tbody>${r.slice(0,80).map(x=>`<tr><td>${x[1]}</td><td class="hint">${x[2]}</td></tr>`).join("")}</tbody></table></div>`:'<div class="hint">Nada raro por ahora.</div>'); }
 function pintarMov(){ const box=$("movRes"); if(!box) return;
   if(!NUBE){ box.innerHTML='<div class="hint">La nube no está disponible en este dispositivo. Abrí la Caja con tu usuario de Claude.</div>'; return; }
   const q=norm(($("movQ").value||"").trim()), cajaF=$("movCaja").value;
@@ -1772,6 +1787,7 @@ function pintarMov(){ const box=$("movRes"); if(!box) return;
     <div class="panel" style="padding:10px"><div class="label">Ventas</div><b class="num" style="font-size:22px">${fmt(tot)}</b><div class="hint">${vs.length} comprobantes${nc?` · ${nc} NC`:""}</div></div>
     ${Object.keys(med).sort((a,b)=>med[b]-med[a]).map(k=>`<div class="panel" style="padding:10px"><div class="label">${escH(k)}</div><b class="num" style="font-size:20px">${fmt(med[k])}</b></div>`).join("")}
     <div class="panel" style="padding:10px"><div class="label">Cobros de cuentas corrientes</div><b class="num" style="font-size:20px">${fmt(cob)}</b></div></div>${prod}
+    ${porCaja(vs)}${revisar(vs)}
     <h3 style="margin:14px 0 6px">Últimos movimientos</h3>
     <div class="tablewrap"><table class="lt"><thead><tr><th>Hora</th><th>Caja · cajero</th><th>Comprobante</th><th>Pago</th><th class="r">Total</th></tr></thead><tbody>
     ${vs.slice(0,150).map(v=>`<tr><td class="num">${escH((v.hora||"").slice(0,5))}</td><td>${escH(v.caja)} · ${escH(v.cajero)}</td><td>${v.nc?"<b style='color:var(--off)'>NC</b> ":""}${escH(v.comp)} #${v.nro}${v.clienteFA?" · "+escH(v.clienteFA.razon):v.cliente?" · "+escH(v.cliente):""}</td><td>${partes(v).map(p=>escH(p.medio)+(partes(v).length>1?" "+fmt(p.monto):"")).join(" + ")}</td><td class="r num">${fmt(v.total)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Sin ventas ese día.</td></tr>'}
