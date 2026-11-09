@@ -868,6 +868,7 @@ function render(flash){
   try{ const vo=vencEnOferta(); carrito.forEach(l=>{ if(l.dto===undefined && vo.has(l.p.cod)){ l.dto=10; l.vto=true; } }); }catch(e){}
   aplicarCombos();
   const tb = $("tbody");
+  const __ae=document.activeElement, __foco=(__ae && tb.contains(__ae) && __ae.id) ? {id:__ae.id, s:__ae.selectionStart, e:__ae.selectionEnd} : null;
   if (!carrito.length) tb.innerHTML = '<tr><td colspan="6" class="empty">Escaneá el primer producto para empezar la venta.</td></tr>';
   else tb.innerHTML = carrito.map((l,i)=>{
     const c = calcLinea(l), p = l.p, step = ((p.fv&&!p.unidad)||p.kg)?0.05:1;
@@ -889,7 +890,8 @@ function render(flash){
       <td><span class="dto${c.manual?' on':''}"><input class="num" id="d${i}" data-dto="${i}" value="${c.manual?l.dto:''}" placeholder="" inputmode="decimal" aria-label="Descuento del producto en %">%${c.manual?`<button type="button" data-auto="${i}" title="Volver al descuento automático" aria-label="Volver al descuento automático">↺</button>`:''}</span></td>
       <td class="r num"><b>${fmt(c.neto)}</b>${c.neto!==c.lista?`<div style="font-size:12px;color:var(--muted);text-decoration:line-through">${fmt(c.lista)}</div>`:''}</td>
       <td><button class="del" type="button" data-del="${i}" aria-label="Quitar">×</button></td></tr>`;
-  }).join("");
+  }).reverse().join("");   // lo último que se pasa queda arriba
+  if (__foco){ const el=$(__foco.id); if(el){ el.focus(); try{ el.setSelectionRange(__foco.s,__foco.e); }catch(e){} } }
 
   const ccSplit = $("spOn").checked && pago!=="Cuenta corriente" && $("spMed2").value==="Cuenta corriente";
   if ((pago==="Cuenta corriente" || ccSplit) && faCli){ let cf=ccPorCli(faCli); if(!cf){ cf={id:"fa"+faCli.cod, nombre:faCli.razon, tel:faCli.cel||faCli.tel||"", saldo:0, desde:null, boletas:[], movs:[], cliCod:faCli.cod, autorizada:false, pedida:new Date().toISOString(), pidio:$("cajero").value.trim()}; CC.push(cf); guardarCC(); try{window.__syncCC&&window.__syncCC();}catch(e){} } ccSel=cf.id; }
@@ -1201,8 +1203,23 @@ function aplicar250(inp){ const i=+(inp.dataset.pr??inp.dataset.det), l=carrito[
   ultimo=l.p; render(); }
 $("tbody").addEventListener("keydown", e=>{ const t=e.target; if(e.key!=="Enter"||(t.dataset.pr===undefined&&t.dataset.det===undefined)) return;
   e.preventDefault(); const i=+(t.dataset.pr??t.dataset.det), esPr=t.dataset.pr!==undefined; aplicar250(t);
-  const sig=esPr? $("t"+i) : null; if(sig){ sig.focus(); sig.select(); } else $("scan").focus(); });
+  // Precio → listo, vuelve al lector. Detalle → si falta el precio, va al costado al casillero del precio.
+  const l=carrito[i], sig=(!esPr && l && !(l.p.precio>0)) ? $("p"+i) : null; if(sig){ sig.focus(); sig.select(); } else $("scan").focus(); });
 $("tbody").addEventListener("change", e=>{ const t=e.target; if(t.dataset.pr!==undefined||t.dataset.det!==undefined) aplicar250(t); });
+// Flechas: ← → se mueven entre los casilleros del mismo renglón; ↑ ↓ al mismo casillero del renglón de arriba/abajo.
+$("tbody").addEventListener("keydown", e=>{
+  const t=e.target; if(t.tagName!=="INPUT" || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+  const fila=t.closest("tr"); if(!fila) return;
+  const mover=dest=>{ e.preventDefault(); const id=dest.id; if(t.dataset.pr!==undefined||t.dataset.det!==undefined) aplicar250(t); else t.dispatchEvent(new Event("change",{bubbles:true})); setTimeout(()=>{ const x=$(id); if(x){ x.focus(); x.select(); } },0); };
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"){
+    const ini=t.selectionStart, fin=t.selectionEnd, len=(t.value||"").length, todo=(ini===0&&fin===len);
+    if(e.key==="ArrowLeft" && !(ini===0&&fin===0) && !todo) return;
+    if(e.key==="ArrowRight" && !(ini===len&&fin===len) && !todo) return;
+    const ins=[...fila.querySelectorAll("input")], sig=ins[ins.indexOf(t)+(e.key==="ArrowRight"?1:-1)];
+    if(sig) mover(sig); return; }
+  const pref=t.id.replace(/\d+$/,""), filas=[...$("tbody").querySelectorAll("tr")], otra=filas[filas.indexOf(fila)+(e.key==="ArrowDown"?1:-1)];
+  if(!otra) return; const dest=[...otra.querySelectorAll("input")].find(x=>x.id.replace(/\d+$/,"")===pref) || otra.querySelector("input"); if(dest) mover(dest);
+});
 $("tbody").addEventListener("click", e=>{ const a=e.target.closest("[data-auto]"); if (a){ delete carrito[a.dataset.auto].dto; render(); }});
 function aplicarDto(inp){
   const l=carrito[inp.dataset.dto], v=inp.value.trim();
