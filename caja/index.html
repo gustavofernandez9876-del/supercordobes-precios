@@ -1308,6 +1308,14 @@ function pintarDisp(){ const ok=confiable(); $("btnDisp").textContent = ok ? "Di
 let dbReg = null, quien = null;
 window.claude?.use?.("db").then(d=>dbReg=d).catch(()=>{});
 window.claude?.use?.("user").then(u=>quien=u).catch(()=>{});
+// Modificaciones sobre ventas ya hechas: quedan registradas y se le informan a Gustavo (colección "alertas", tipo modificación).
+async function registrarCambio(detalle){
+  const ahora=new Date();
+  const reg={ fecha:ahora.toISOString(), dia:ahora.toLocaleDateString("es-AR"), hora:ahora.toLocaleTimeString("es-AR",{hour12:false}), tipo:"modificacion",
+    accion:"Modificación de venta: "+detalle, caja:$("caja").value, responsable:$("cajero").value.trim()||"(sin nombre)", turno:$("turno").value, avisado:false };
+  try{ const l=JSON.parse(localStorage.getItem("cajaCambios")||"[]"); l.push(reg); localStorage.setItem("cajaCambios",JSON.stringify(l)); }catch(e){}
+  try{ if(dbReg) await dbReg.collection("alertas").add(reg); }catch(e){}
+}
 async function registrarIntento(accion){
   const ahora = new Date();
   const reg = { fecha: ahora.toISOString(), dia: ahora.toLocaleDateString("es-AR"), hora: ahora.toLocaleTimeString("es-AR",{hour12:false}),
@@ -1369,6 +1377,7 @@ function emitirNC(){
   const nc = {nro:nro++, nc:true, ref:ncSel.nro, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, cajero:$("cajero").value.trim()||"Sin nombre",
     autorizo:ncAut, motivo, devuelveStock:$("ncStock").checked, pago:ncSel.pago, comp:tipoNC(ncSel.comp), cliente:ncSel.cliente||"", clienteFA:ncSel.clienteFA||null, total, items};
   ventas.push(nc); guardar();
+  try{ registrarCambio(`Nota de crédito #${nc.nro} sobre venta #${nc.ref} (${ncSel.fecha} ${ncSel.hora}) por ${fmt(total)} · autorizó ${ncAut} · motivo: ${motivo} · ${items.map(i=>i.q+" "+i.desc).join(", ")}`); }catch(e){}
   if (ncSel.pago==="Cuenta corriente" && ncSel.cliente){ const c=CC.find(x=>x.nombre===ncSel.cliente);
     if (c){ c.saldo=Math.max(0,c.saldo+total); c.movs.push({fecha:diaISO(new Date()),tipo:"Nota de crédito",monto:total,ref:ncSel.nro}); if (c.saldo===0) c.desde=null; guardarCC(); } }
   $("ncModal").hidden=true; $("ncMotivo").value="";
@@ -1800,7 +1809,7 @@ function revisar(vs){ const r=[];
     (v.items||[]).forEach(i=>{ if(i.dto!=null && i.dto!==0) r.push([v.ts||0,`Descuento a mano ${i.dto}% en ${escH(i.desc)} (${fmt(i.importe)})`,id]);
       if(i.cod==="250V" && i.importe>=50000) r.push([v.ts||0,`Varios de balanza alto: ${fmt(i.importe)}`,id]); });
     if(!(v.total>0) && !v.nc) r.push([v.ts||0,`Venta en $0 o negativa (${fmt(v.total)})`,id]); });
-  movAlertas.forEach(a=>r.push([Date.parse(a.fecha)||0,`<b style="color:var(--off)">Clave incorrecta:</b> ${escH(a.accion)}`,`${escH((a.hora||"").slice(0,5))} · ${escH(a.caja)} · ${escH(a.responsable)}`]));
+  movAlertas.forEach(a=>r.push([Date.parse(a.fecha)||0,`<b style="color:var(--off)">${a.tipo==="modificacion"?"Modificación:":"Clave incorrecta:"}</b> ${escH(a.tipo==="modificacion"?a.accion.replace(/^Modificación de venta: /,""):a.accion)}`,`${escH((a.hora||"").slice(0,5))} · ${escH(a.caja)} · ${escH(a.responsable)}`]));
   r.sort((a,b)=>b[0]-a[0]);
   return `<h3 style="margin:14px 0 6px">Para revisar ${r.length?`<span style="color:var(--off)">(${r.length})</span>`:""}</h3>`+(r.length?`<div class="tablewrap"><table class="lt"><tbody>${r.slice(0,80).map(x=>`<tr><td>${x[1]}</td><td class="hint">${x[2]}</td></tr>`).join("")}</tbody></table></div>`:'<div class="hint">Nada raro por ahora.</div>'); }
 function pintarMov(){ const box=$("movRes"); if(!box) return;
