@@ -212,6 +212,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnVenc" type="button">Vencimientos</button>
     <button class="btn" id="btnVencCel" type="button" onclick="location.hash='#venc';location.reload()">📱 App vencimientos</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
+    <button class="btn" id="btnFondo" type="button">Ingreso de fondos</button>
     <button class="btn" id="btnCierre" type="button">Cerrar caja</button>
     <button class="btn" id="btnFull" type="button">Pantalla completa</button>
     <button class="btn primary" id="btnCliente" type="button">Pantalla cliente</button>
@@ -439,6 +440,17 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn" type="button" id="cobCancel">Cancelar</button><button class="btn primary" type="button" id="cobOk">Registrar cobro</button></div>
   </div>
 </div>
+<div class="modal" id="ifModal" hidden>
+  <div class="ticket" role="dialog" aria-labelledby="ifTit">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="ifTit">Ingreso de fondos</h3><button class="del" id="ifX" type="button" aria-label="Cerrar">×</button></div>
+    <div class="hint" id="ifCab"></div>
+    <label for="ifMonto" style="display:block;margin-top:10px">Monto que entra a la caja</label><input id="ifMonto" type="number" min="0" step="100" inputmode="numeric" style="width:100%">
+    <label for="ifConc" style="display:block;margin-top:8px">Concepto</label><select id="ifConc" style="width:100%"><option>Fondo inicial (cambio)</option><option>Refuerzo de cambio</option><option>Otro ingreso</option></select>
+    <label for="ifQuien" style="display:block;margin-top:8px">Quién lo entrega / registra</label><input id="ifQuien" type="text" style="width:100%">
+    <button class="btn primary" id="ifOk" type="button" style="width:100%;margin-top:12px">Guardar ingreso</button>
+    <div class="label" style="margin-top:12px">Ingresos de este turno (sin cerrar)</div><div id="ifList" class="hist num"></div>
+  </div>
+</div>
 <div class="modal" id="ciModal" hidden>
   <div class="ticket ci" role="dialog" aria-labelledby="ciTit">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -448,7 +460,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <div id="ciCab" style="color:var(--muted);font-size:13px"></div>
     <div class="cigrid">
       <label for="ciQuien">Cierra la caja</label><input id="ciQuien" type="text">
-      <label for="ciFondo">Fondo inicial (cambio)</label><input id="ciFondo" type="number" min="0" step="100" inputmode="numeric">
+      <label for="ciFondo">Fondos ingresados (fondo + refuerzos)</label><input id="ciFondo" type="number" min="0" step="100" inputmode="numeric" title="Se completa solo con los ingresos de fondos guardados en el turno">
     </div>
     <div class="label" style="margin-top:12px">Retiros y gastos pagados con plata de la caja</div>
     <div id="ciMovs"></div>
@@ -1423,12 +1435,12 @@ function sistemaCaja(){
 function porComp(vs){ const m={"Factura B":0,"Factura A":0,"Remito interno":0}; let nc=0, ci=0; vs.forEach(v=>{ if(v.nc){ nc+=v.total; return; } if(v.comp==="Consumo interno"){ ci+=v.valorInterno||0; return; } m[v.comp]=(m[v.comp]||0)+v.total; }); return {m,nc,ci,total:Object.values(m).reduce((a,x)=>a+x,0)-nc}; }
 function htmlPorComp(pc){ return `<div class="label" style="margin-top:10px">Ventas del turno por comprobante</div>`+Object.keys(pc.m).map(k=>`<div class="tl num"><span>${k}</span><span>${fmt(pc.m[k])}</span></div>`).join("")+(pc.nc?`<div class="tl num"><span>Notas de crédito / devoluciones</span><span>−${fmt(pc.nc)}</span></div>`:"")+`<div class="tl num" style="font-weight:700"><span>TOTAL VENDIDO (facturas + remitos)</span><span>${fmt(pc.total)}</span></div>`+(pc.ci?`<div class="tl num" style="color:var(--muted)"><span>Consumo interno (no cobrado, a precio de lista)</span><span>${fmt(pc.ci)}</span></div>`:""); }
 function abrirCierre(){
-  ciMovs=[]; $("ciQuien").value=$("cajero").value; $("ciFondo").value=$("ciFondo").value||"";
+  ciMovs=[]; $("ciQuien").value=$("cajero").value; $("ciFondo").value=fondosAb().length?totFondos():($("ciFondo").value||"");
   $("ciCab").innerHTML=`${$("caja").value} · turno ${$("turno").value} · ${hoy()} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`+htmlPorComp(porComp(abiertas()));
   $("ciBill").innerHTML=BILLETES.map(b=>`<label for="ciB${b}"><b>$${b.toLocaleString("es-AR")}</b><i aria-hidden="true">×</i><input id="ciB${b}" type="number" min="0" step="1" inputmode="numeric" data-b="${b}"><span id="ciBt${b}">$ 0</span></label>`).join("")+
     `<label for="ciMon"><b>Monedas</b><i aria-hidden="true">$</i><input id="ciMon" type="number" min="0" step="10" inputmode="numeric"><span></span></label>`;
   $("ciArq").innerHTML=`<span class="h">Medio</span><span class="h">Según sistema</span><span class="h">Declarado</span><span class="h">Diferencia</span>`+
-    `<span><b>Efectivo</b><br><small style="color:var(--muted)">fondo + ventas − retiros − gastos</small></span><span id="ciSisEf"></span><span id="ciDecEf"></span><span id="ciDifEf" class="dif"></span>`+
+    `<span><b>Efectivo</b><br><small style="color:var(--muted)">fondos + ventas − retiros − gastos</small></span><span id="ciSisEf"></span><span id="ciDecEf"></span><span id="ciDifEf" class="dif"></span>`+
     MEDIOS_DECL.map(m=>`<span>${m}<br><small style="color:var(--muted)">${m==="QR"||m==="Transferencia"?"según la app / el banco":"según el cierre del posnet"}</small></span><span id="ciSis${m}"></span><input id="ciDec${m}" type="number" min="0" step="1" inputmode="numeric" aria-label="Declarado ${m}"><span id="ciDif${m}" class="dif"></span>`).join("")+
     `<span>Cuenta corriente<br><small style="color:var(--muted)">vendido a cuenta, no se cuenta</small></span><span id="ciSisCC"></span><span></span><span></span>`;
   pintarMovs(); calcCierre(); pintarHistCierres();
@@ -1453,15 +1465,15 @@ function calcCierre(){
 }
 function confirmarCierre(){
   const quien=$("ciQuien").value.trim(); if (!quien){ aviso("Escribí el nombre de quien cierra la caja."); $("ciQuien").focus(); return; }
-  if ($("ciFondo").value===""){ aviso("Cargá el fondo inicial (si no hubo, poné 0)."); $("ciFondo").focus(); return; }
+  if ($("ciFondo").value===""){ aviso("Cargá los fondos ingresados (si no hubo, poné 0)."); $("ciFondo").focus(); return; }
   const falta=MEDIOS_DECL.filter(m=>$("ciDec"+m).value==="" && Math.abs(sistemaCaja()[m])>0);
   if (falta.length){ aviso("Falta declarar: "+falta.join(", ")+". Si no hubo, poné 0."); $("ciDec"+falta[0]).focus(); return; }
   const r=calcCierre(), id="C"+Date.now(), vs=abiertas(), cs=cobrosAb();
   const billetes={}; BILLETES.forEach(b=>{ const n=+$("ciB"+b).value||0; if(n) billetes[b]=n; });
-  const c={id, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien, responsable:$("cajero").value, fondo:r.fondo, movimientos:ciMovs.slice(),
+  const c={id, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien, responsable:$("cajero").value, fondo:r.fondo, ingresosFondos:fondosAb().map(f=>({hora:f.hora,concepto:f.concepto,quien:f.quien,monto:f.monto})), movimientos:ciMovs.slice(),
     billetes, monedas:+$("ciMon").value||0, sistema:r.sis, declarado:r.dec, diferencia:r.dif, ventaCuentaCorriente:r.cc,
     comprobantes:vs.length, notasCredito:vs.filter(v=>v.nc).length, totalComprobantes:porComp(vs).total, porComp:porComp(vs), obs:$("ciObs").value.trim()};
-  vs.forEach(v=>v.cierre=id); cs.forEach(x=>x.cierre=id); cierres.push(c);
+  vs.forEach(v=>v.cierre=id); cs.forEach(x=>x.cierre=id); fondosAb().forEach(f=>f.cierre=id); guardarFondos(); cierres.push(c);
   guardar(); try { localStorage.setItem("cajaCobrosCC",JSON.stringify(cobros)); localStorage.setItem("cajaCierres",JSON.stringify(cierres)); } catch(e) {}
   $("ciModal").hidden=true; $("ciObs").value="";
   const fila=(m)=>`<div class="tl num"><span>${m}</span><span>${fmt(c.sistema[m])} → ${c.declarado[m]==null?"—":fmt(c.declarado[m])} <b style="color:${c.diferencia[m]==null||Math.abs(c.diferencia[m])<1?"var(--accent)":"var(--off)"}">${c.diferencia[m]==null?"":(c.diferencia[m]>0?"+":c.diferencia[m]<0?"−":"")+fmt(Math.abs(c.diferencia[m]))}</b></span></div>`;
@@ -1469,7 +1481,7 @@ function confirmarCierre(){
     <div class="tl"><span>Cerró</span><b>${c.quien}</b></div><div class="tl"><span>Responsable del turno</span><span>${c.responsable}</span></div>
     <div class="tl num"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""} · ${fmt(c.totalComprobantes)}</span></div><hr>
     ${c.porComp?htmlPorComp(c.porComp)+"<hr>":""}
-    <div class="tl num"><span>Fondo inicial</span><span>${fmt(c.fondo)}</span></div>
+    <div class="tl num"><span><b>Fondos ingresados</b></span><b>${fmt(c.fondo)}</b></div>${(c.ingresosFondos||[]).map(f=>`<div class="tl num" style="font-size:13px"><span>  ${f.hora.slice(0,5)} · ${f.concepto} · ${f.quien}</span><span>+${fmt(f.monto)}</span></div>`).join("")}
     ${c.movimientos.map(x=>`<div class="tl num"><span>${x.tipo}: ${x.concepto}</span><span>−${fmt(x.monto)}</span></div>`).join("")}
     <div class="label" style="margin-top:8px">Sistema → declarado · diferencia</div>
     ${["Efectivo",...MEDIOS_DECL].map(fila).join("")}
@@ -1493,7 +1505,7 @@ function imprimirCierre(c){
   <div class="r"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""}</span></div>
   ${c.porComp?Object.keys(c.porComp.m).map(k=>`<div class="r s"><span>${k}</span><span>${fmt(c.porComp.m[k])}</span></div>`).join("")+(c.porComp.nc?`<div class="r s"><span>Notas de crédito</span><span>−${fmt(c.porComp.nc)}</span></div>`:""):""}
   <div class="r"><b>Total vendido (fact.+remitos)</b><b>${fmt(c.totalComprobantes)}</b></div>
-  <div class="r"><span>Fondo inicial</span><span>${fmt(c.fondo)}</span></div>
+  <div class="r"><b>Fondos ingresados</b><b>${fmt(c.fondo)}</b></div>${(c.ingresosFondos||[]).map(f=>`<div class="r s"><span>${esc(f.hora.slice(0,5))} ${esc(f.concepto)} (${esc(f.quien)})</span><span>+${fmt(f.monto)}</span></div>`).join("")}
   ${(c.movimientos||[]).map(x=>`<div class="r s"><span>${esc(x.tipo)}: ${esc(x.concepto)}</span><span>−${fmt(x.monto)}</span></div>`).join("")}<hr>
   <div><b>Sistema / declarado / diferencia</b></div>${["Efectivo",...MEDIOS_DECL].map(fila).join("")}
   <div class="r"><span>Cuenta corriente</span><span>${fmt(c.ventaCuentaCorriente||0)}</span></div><hr>
@@ -1510,6 +1522,18 @@ function pintarHistCierres(){
     return `<div><span>${c.fecha} ${c.hora.slice(0,5)} · ${c.caja} · ${c.turno} · cerró ${c.quien}</span><b style="color:${Math.abs(d)<1?"var(--accent)":"var(--off)"}">${Math.abs(d)<1?"sin diferencia":(d>0?"sobrante +":"faltante −")+fmt(Math.abs(d))}</b> <button class="btn" type="button" data-impc="${c.id}" style="padding:2px 8px">🖨</button></div>`; }).join("") || '<div style="color:var(--muted)">Todavía no hay cierres.</div>';
 }
 $("btnCierre").addEventListener("click", ()=>abrirCierre());
+let FONDOS=[]; try{ FONDOS=JSON.parse(localStorage.getItem("cajaFondos")||"[]"); }catch(e){}
+const guardarFondos=()=>{ try{ localStorage.setItem("cajaFondos",JSON.stringify(FONDOS)); }catch(e){} };
+const fondosAb=()=>FONDOS.filter(f=>!f.cierre && f.caja===$("caja").value);
+const totFondos=()=>fondosAb().reduce((a,f)=>a+f.monto,0);
+function pintarFondos(){ const fs=fondosAb(); $("ifCab").textContent=$("caja").value+" · turno "+$("turno").value+" · "+hoy()+" · total ingresado "+fmt(totFondos());
+  $("ifList").innerHTML=fs.length?fs.map(f=>`<div><span>${f.fecha} ${f.hora.slice(0,5)} · ${escH(f.concepto)} · ${escH(f.quien)}</span><b>${fmt(f.monto)}</b></div>`).join(""):'<div style="color:var(--muted)">Todavía no hay ingresos.</div>'; }
+$("btnFondo").addEventListener("click",()=>{ $("ifMonto").value=""; $("ifQuien").value=$("cajero").value; $("ifConc").value=fondosAb().length?"Refuerzo de cambio":"Fondo inicial (cambio)"; pintarFondos(); $("ifModal").hidden=false; $("ifMonto").focus(); });
+$("ifX").addEventListener("click",()=>{ $("ifModal").hidden=true; });
+$("ifOk").addEventListener("click",()=>{ const m=Math.round(+$("ifMonto").value||0); if(!(m>0)){ aviso("Poné el monto que entra a la caja."); $("ifMonto").focus(); return; }
+  const q=$("ifQuien").value.trim(); if(!q){ aviso("Escribí quién registra el ingreso."); $("ifQuien").focus(); return; }
+  FONDOS.push({id:"F"+Date.now(), fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien:q, concepto:$("ifConc").value, monto:m, ts:Date.now()});
+  guardarFondos(); $("ifMonto").value=""; $("ifConc").value="Refuerzo de cambio"; pintarFondos(); aviso("Ingreso de "+fmt(m)+" guardado."); });
 $("ciCerrarX").addEventListener("click", ()=>{ $("ciModal").hidden=true; $("scan").focus(); });
 $("ciModal").addEventListener("input", calcCierre);
 $("ciMovAdd").addEventListener("click", ()=>{ const m=Math.round(+$("ciMovMonto").value||0), k=$("ciMovConc").value.trim();
