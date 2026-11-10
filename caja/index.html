@@ -207,7 +207,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnFalt" type="button">Productos faltantes</button>
     <button class="btn" id="btnCompA" type="button">Compras Factura A</button>
     <button class="btn" id="btnPagProv" type="button">Pago a proveedores</button>
-    <button class="btn" id="btnMiDia" type="button">Mi caja hoy</button>
+    <button class="btn" id="btnMiDia" type="button">Movimientos de hoy</button>
     <button class="btn" id="btnCheques" type="button">Cheques a pagar</button>
     <button class="btn" id="btnVenc" type="button">Vencimientos</button>
     <button class="btn" id="btnVencCel" type="button" onclick="location.hash='#venc';location.reload()">📱 App vencimientos</button>
@@ -1856,26 +1856,31 @@ $("chList").addEventListener("click",e=>{ const b=e.target.closest("[data-deb]")
   if(!confirm(`¿Confirmás que el cheque ${x.chN||""} de ${x.prov} por ${fmt(x.monto)} ya se debitó en el banco?`)) return;
   x.debitado=fISO(new Date()); x.ts=Date.now(); guardarPP(); subirPP(x); pintarCh(); });
 $("btnPagProv").addEventListener("click",()=>{ verCh(); pintarPP(); pintarCh(); $("ppModal").hidden=false; $("ppProv").focus(); });
+let mdCaja=null;
+function ventasHoyTodas(){ const m=new Map(); [...(typeof ventasNube!=="undefined"?ventasNube:[]),...ventas].forEach(v=>{ if(v.fecha===hoy()) m.set(v.caja+"|"+v.nro,v); }); return [...m.values()]; }
 function miDia(){
-  const c=$("caja").value, vs=ventas.filter(v=>v.caja===c && v.fecha===hoy()).sort((a,b)=>(b.hora||"").localeCompare(a.hora||""));
-  const cs=cobros.filter(x=>x.caja===c && x.fecha===hoy());
+  const todas=ventasHoyTodas(), cajas=[...new Set(todas.map(v=>v.caja).concat([$("caja").value]))].sort();
+  if(mdCaja===null) mdCaja=$("caja").value;
+  const c=mdCaja, vs=todas.filter(v=>!c||v.caja===c).sort((a,b)=>(b.hora||"").localeCompare(a.hora||""));
+  const cs=cobros.filter(x=>(!c||x.caja===c) && x.fecha===hoy());
   const med={}; let tot=0, nc=0; vs.forEach(v=>{ const sg=v.nc?-1:1; (v.pagos&&v.pagos.length?v.pagos:[{medio:v.pago,monto:v.total}]).forEach(p=>med[p.medio]=(med[p.medio]||0)+sg*p.monto); tot+=sg*v.total; if(v.nc) nc++; });
   const abiertas=vs.filter(v=>!v.cierre).length;
-  $("ticket").innerHTML=`<h3>Mi caja hoy</h3><div style="color:var(--muted)">${escH(c)} · ${hoy()} · ${vs.length} comprobantes${nc?` (${nc} NC)`:""} · ${abiertas} sin cerrar</div><hr>
+  $("ticket").innerHTML=`<h3>Movimientos de hoy</h3><select id="mdSel" style="margin:4px 0 6px">${["",...cajas].map(k=>`<option value="${escH(k)}"${k===c?" selected":""}>${k?escH(k):"Todas las cajas"}</option>`).join("")}</select><div style="color:var(--muted)">Solo lectura · ${escH(c||"Todas")} · ${hoy()} · ${vs.length} comprobantes${nc?` (${nc} NC)`:""} · ${abiertas} sin cerrar</div><hr>
    <div class="tl num" style="font-size:20px;font-weight:700"><span>Total vendido</span><span>${fmt(tot)}</span></div>
    ${Object.keys(med).sort((a,b)=>med[b]-med[a]).map(k=>`<div class="tl num"><span>${escH(k)}</span><span>${fmt(med[k])}</span></div>`).join("")}
    ${cs.length?`<div class="tl num"><span>Cobros de cuenta corriente</span><span>${fmt(cs.reduce((a,x)=>a+(x.monto||0),0))}</span></div>`:""}
    <hr><div class="label">Movimientos</div><div style="max-height:45vh;overflow:auto">
-   ${vs.map(v=>`<div class="tl num" data-mdv="${v.nro}" style="cursor:pointer" title="Tocá para ver el detalle"><span>▸ ${escH((v.hora||"").slice(0,5))} · #${v.nro} ${v.nc?"<b style='color:var(--off)'>NC</b> ":""}${escH(v.comp)} · ${escH(v.pago)} · ${escH(v.cajero)}</span><span>${v.nc?"−":""}${fmt(v.total)}</span></div>`).join("")||'<div class="hint">Todavía no hay ventas hoy en esta caja.</div>'}</div>
+   ${vs.map(v=>`<div class="tl num" data-mdv="${escH(v.caja)}|${v.nro}" style="cursor:pointer" title="Tocá para ver el detalle"><span>▸ ${escH((v.hora||"").slice(0,5))} · #${v.nro} ${v.nc?"<b style='color:var(--off)'>NC</b> ":""}${escH(v.comp)} · ${escH(v.pago)} · ${escH(v.caja)} · ${escH(v.cajero)}</span><span>${v.nc?"−":""}${fmt(v.total)}</span></div>`).join("")||'<div class="hint">Todavía no hay ventas hoy en esta caja.</div>'}</div>
    <button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:14px">Volver a la caja</button>`;
+  $("mdSel").onchange=e=>{ mdCaja=e.target.value; miDia(); };
   $("modal").hidden=false; }
-$("btnMiDia").addEventListener("click",miDia);
-function verBoleta(nro){ const v=ventas.find(x=>x.nro==nro && x.caja===$("caja").value && x.fecha===hoy()); if(!v) return;
+$("btnMiDia").addEventListener("click",()=>{ mdCaja=null; miDia(); });
+function verBoleta(nro){ const [cj,nr]=String(nro).split("|"); const v=ventasHoyTodas().find(x=>x.caja===cj && x.nro==nr); if(!v) return;
   $("ticket").innerHTML=`<h3>${v.nc?"Nota de crédito":escH(v.comp)} #${v.nro}</h3><div style="color:var(--muted)">${escH(v.fecha)} ${escH(v.hora)} · ${escH(v.caja)} · ${escH(v.cajero)}${v.cliente?" · "+escH(v.cliente):v.clienteFA?" · "+escH(v.clienteFA.razon):""}</div><hr>`+
    (v.items||[]).map(i=>`<div class="tl num"><span>${escH(i.q)} ${escH(i.desc)}</span><span>${fmt(i.importe)}</span></div>`).join("")+
    `<hr><div class="tl num" style="font-size:20px;font-weight:700"><span>TOTAL</span><span>${fmt(v.total)}</span></div><div class="tl"><span>Pago</span><span>${escH(v.pago)}</span></div>
    <button class="btn" id="btnImpBol" type="button" style="width:100%;margin-top:14px">🖨 Reimprimir ticket</button>
-   <button class="btn" id="btnMiDia2" type="button" style="width:100%;margin-top:8px">← Volver a Mi caja hoy</button>
+   <button class="btn" id="btnMiDia2" type="button" style="width:100%;margin-top:8px">← Volver a los movimientos</button>
    <button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:8px">Volver a la caja</button>`;
   $("btnImpBol").onclick=()=>imprimirTicket(v); $("btnMiDia2").onclick=miDia; $("modal").hidden=false; }
 $("modal").addEventListener("click",e=>{ const r=e.target.closest("[data-mdv]"); if(r) verBoleta(r.dataset.mdv); });
