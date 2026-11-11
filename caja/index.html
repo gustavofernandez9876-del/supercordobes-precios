@@ -1960,9 +1960,11 @@ function verBoleta(nro){ const [cj,nr]=String(nro).split("|"); const v=ventasHoy
    (v.items||[]).map(i=>`<div class="tl num"><span>${escH(i.q)} ${escH(i.desc)}</span><span>${fmt(i.importe)}</span></div>`).join("")+
    `<hr><div class="tl num" style="font-size:20px;font-weight:700"><span>TOTAL</span><span>${fmt(v.total)}</span></div><div class="tl"><span>Pago</span><span>${escH(v.pago)}</span></div>
    <button class="btn" id="btnImpBol" type="button" style="width:100%;margin-top:14px">🖨 Reimprimir ticket</button>
+   ${(!v.nc && !v.cae && ventas.includes(v) && v.comp!=="Consumo interno")?`<div style="display:flex;gap:6px;margin-top:8px;align-items:center"><span style="white-space:nowrap">Cambiar a:</span><select id="ccCompSel" style="flex:1">${["Factura B","Remito interno","Factura A"].filter(c=>c!==v.comp).map(c=>`<option>${c}</option>`).join("")}</select><button class="btn" id="ccCompOk" type="button">Cambiar y reimprimir</button></div>`:(v.cae?`<div class="hint" style="margin-top:8px">Ya tiene CAE de ARCA: para cambiarla hay que hacer una nota de crédito.</div>`:"")}
    <button class="btn" id="btnMiDia2" type="button" style="width:100%;margin-top:8px">← Volver a los movimientos</button>
    <button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:8px">Volver a la caja</button>`;
-  $("btnImpBol").onclick=()=>imprimirTicket(v); $("btnMiDia2").onclick=miDia; $("modal").hidden=false; }
+  $("btnImpBol").onclick=()=>imprimirTicket(v); $("btnMiDia2").onclick=miDia;
+  if($("ccCompOk")) $("ccCompOk").onclick=()=>{ const n=$("ccCompSel").value, ant=v.comp; v.comp=n; if(n!=="Factura A") v.clienteFA=null; v.cambioComp={de:ant,hora:hora()}; guardar(); imprimirTicket(v); aviso("Boleta #"+v.nro+" cambiada de "+ant+" a "+n); verBoleta(v.caja+"|"+v.nro); }; $("modal").hidden=false; }
 $("modal").addEventListener("click",e=>{ const r=e.target.closest("[data-mdv]"); if(r) verBoleta(r.dataset.mdv); });
 $("btnCheques").addEventListener("click",()=>{ verCh(); pintarPP(); pintarCh(); $("ppModal").hidden=false; $("chRes").scrollIntoView(); });
 $("ppX").addEventListener("click",()=>{ $("ppModal").hidden=true; $("scan").focus(); });
