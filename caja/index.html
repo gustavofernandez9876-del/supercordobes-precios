@@ -1871,7 +1871,7 @@ function pintarMov(){ const box=$("movRes"); if(!box) return;
     prod=`<h3 style="margin:14px 0 6px">Producto: “${escH($("movQ").value)}”</h3>`+(ks.length?`<table class="lt"><thead><tr><th>Producto</th><th class="r">Unid.</th><th class="r">Importe</th></tr></thead><tbody>${ks.map(k=>`<tr><td>${escH(k)}</td><td class="r num">${m[k].q.toLocaleString("es-AR")}</td><td class="r num">${fmt(m[k].imp)}</td></tr>`).join("")}</tbody></table>`:'<div class="hint">No se vendió ese día.</div>'); }
   box.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0">
     <div class="panel" style="padding:10px"><div class="label">Ventas</div><b class="num" style="font-size:22px">${fmt(tot)}</b><div class="hint">${vs.length} comprobantes${nc?` · ${nc} NC`:""}</div></div>
-    ${Object.keys(med).sort((a,b)=>med[b]-med[a]).map(k=>`<div class="panel" style="padding:10px"><div class="label">${escH(k)}</div><b class="num" style="font-size:20px">${fmt(med[k])}</b></div>`).join("")}
+    ${["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente",...Object.keys(med).filter(k=>!["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente"].includes(k))].map(k=>`<div class="panel" style="padding:10px"><div class="label">${k==="Cuenta corriente"?"Vendido a cuenta corriente":escH(k)}</div><b class="num" style="font-size:20px">${fmt(med[k]||0)}</b></div>`).join("")}
     <div class="panel" style="padding:10px"><div class="label">Cobros de cuentas corrientes</div><b class="num" style="font-size:20px">${fmt(cob)}</b></div></div>${prod}
     ${porCaja(vs)}${revisar(vs)}
     <h3 style="margin:14px 0 6px">Últimos movimientos</h3>
