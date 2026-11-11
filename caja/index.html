@@ -355,7 +355,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
 
 <section class="vista" id="vMov" hidden>
   <div class="vhead"><h2>Movimientos</h2><span id="nubeEst" style="font-size:13px;font-weight:600"></span></div>
-  <div class="vfil"><input id="movDia" type="date" aria-label="Día"><select id="movCaja" aria-label="Caja"><option value="">Todas las cajas</option></select>
+  <div class="vfil"><select id="movPer" aria-label="Período"><option value="dia">Día</option><option value="sem">Últimos 7 días</option><option value="mes">Mes</option><option value="todo">Desde el inicio</option></select><input id="movDia" type="date" aria-label="Día"><select id="movCaja" aria-label="Caja"><option value="">Todas las cajas</option></select>
   <input id="movQ" type="search" placeholder="Buscar producto vendido (ej. coca 2.25)" aria-label="Producto"></div>
   <div id="movRes"></div>
 </section>
@@ -1852,7 +1852,15 @@ window.claude?.use?.("db").then(d=>{ if(!d) { pintarNube(); return; } NUBE=d; su
 }).catch(()=>pintarNube());
 // ===== Vista Movimientos (para ver desde el teléfono) =====
 let movUnsub=null, movCobUnsub=null, movCobros=[], movDia="";
-function movSuscribir(dia){ if(!NUBE) return; movDia=dia; movUnsub&&movUnsub(); movCobUnsub&&movCobUnsub();
+const INICIO_SIS="2026-11-11"; let movMulti=[];
+function diasRango(per,dia){ const d=new Date(dia+"T12:00"); let a; if(per==="sem"){ a=new Date(d); a.setDate(a.getDate()-6); } else if(per==="mes"){ a=new Date(d.getFullYear(),d.getMonth(),1,12); } else { a=new Date(INICIO_SIS+"T12:00"); d.setTime(Math.max(d.getTime(),Date.now())); }
+  const out=[]; const ini=new Date(INICIO_SIS+"T12:00"); if(a<ini) a=ini; for(let x=new Date(a); x<=d && out.length<400; x.setDate(x.getDate()+1)) out.push(diaISO(x)); return out; }
+function movSuscribirRango(per,dia){ if(!NUBE) return; movUnsub&&movUnsub(); movCobUnsub&&movCobUnsub(); movMulti.forEach(f=>{try{f()}catch(e){}}); movMulti=[];
+  const V={}, C={}; ventasNube=[]; movCobros=[];
+  diasRango(per,dia).forEach(dd=>{ movMulti.push(NUBE.collection(`dias/${dd}/ventas`).onSnapshot(s=>{ V[dd]=s.docs.map(x=>({...x.data(),_dia:dd})); ventasNube=Object.values(V).flat(); pintarMov(); },()=>{}));
+    movMulti.push(NUBE.collection(`dias/${dd}/cobros`).onSnapshot(s=>{ C[dd]=s.docs.map(x=>x.data()); movCobros=Object.values(C).flat(); pintarMov(); },()=>{})); });
+  pintarMov(); }
+function movSuscribir(dia){ if(!NUBE) return; movMulti.forEach(f=>{try{f()}catch(e){}}); movMulti=[]; movDia=dia; movUnsub&&movUnsub(); movCobUnsub&&movCobUnsub();
   movUnsub=NUBE.collection(`dias/${dia}/ventas`).onSnapshot(s=>{ ventasNube=s.docs.map(x=>x.data()); if(dia===diaISO(new Date())) window.__vn=ventasNube; if(dia===diaISO(new Date())) render(); pintarMov(); }, ()=>{});
   movCobUnsub=NUBE.collection(`dias/${dia}/cobros`).onSnapshot(s=>{ movCobros=s.docs.map(x=>x.data()); pintarMov(); }, ()=>{});
   try{ window.__movAlU&&window.__movAlU(); const [y,m,d]=dia.split("-"); const dd=(+d)+"/"+(+m)+"/"+y; window.__movAlU=NUBE.collection("alertas").onSnapshot(s=>{ movAlertas=s.docs.map(x=>x.data()).filter(a=>a.dia===dd); pintarMov(); },()=>{}); }catch(e){} }
@@ -1874,7 +1882,7 @@ function revisar(vs){ const r=[];
 function pintarMov(){ const box=$("movRes"); if(!box) return;
   if(!NUBE){ box.innerHTML='<div class="hint">La nube no está disponible en este dispositivo. Abrí la Caja con tu usuario de Claude.</div>'; return; }
   const q=norm(($("movQ").value||"").trim()), cajaF=$("movCaja").value;
-  let vs=ventasNube.filter(v=>!cajaF||v.caja===cajaF).sort((a,b)=>b.ts-a.ts);
+  let vs=ventasNube.filter(v=>!cajaF||v.caja===cajaF).sort((a,b)=>(b.ts||0)-(a.ts||0));
   const cajas=[...new Set(ventasNube.map(v=>v.caja))].sort(); const sel=$("movCaja"); const prev=sel.value;
   sel.innerHTML='<option value="">Todas las cajas</option>'+cajas.map(c=>`<option>${escH(c)}</option>`).join(""); sel.value=prev;
   const med={}; let tot=0, nc=0; vs.forEach(v=>{ const sg=v.nc?-1:1; partes(v).forEach(p=>{ med[p.medio]=(med[p.medio]||0)+sg*p.monto; }); tot+=sg*v.total; if(v.nc) nc++; });
@@ -1886,15 +1894,18 @@ function pintarMov(){ const box=$("movRes"); if(!box) return;
   box.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0">
     <div class="panel" style="padding:10px"><div class="label">Ventas</div><b class="num" style="font-size:22px">${fmt(tot)}</b><div class="hint">${vs.length} comprobantes${nc?` · ${nc} NC`:""}</div></div>
     ${["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente",...Object.keys(med).filter(k=>!["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente"].includes(k))].map(k=>`<div class="panel" style="padding:10px"><div class="label">${k==="Cuenta corriente"?"Vendido a cuenta corriente":escH(k)}</div><b class="num" style="font-size:20px">${fmt(med[k]||0)}</b></div>`).join("")}
+    ${(()=>{ const fa=vs.filter(v=>v.comp==="Factura A"||v.comp==="Nota de crédito A").reduce((a,v)=>a+(v.nc?-1:1)*v.total,0), fb=vs.filter(v=>v.comp==="Factura B"||v.comp==="Nota de crédito B").reduce((a,v)=>a+(v.nc?-1:1)*v.total,0), ri=vs.filter(v=>v.comp==="Remito interno").reduce((a,v)=>a+v.total,0);
+  return `<div class="panel" style="padding:10px"><div class="label">Factura A</div><b class="num" style="font-size:20px">${fmt(fa)}</b></div><div class="panel" style="padding:10px"><div class="label">Factura B</div><b class="num" style="font-size:20px">${fmt(fb)}</b></div><div class="panel" style="padding:10px"><div class="label">Remito interno (no fiscal)</div><b class="num" style="font-size:20px">${fmt(ri)}</b></div>`; })()}
     <div class="panel" style="padding:10px"><div class="label">Cobros de cuentas corrientes</div><b class="num" style="font-size:20px">${fmt(cob)}</b></div></div>${prod}
     ${porCaja(vs)}${revisar(vs)}
     <h3 style="margin:14px 0 6px">Últimos movimientos <small style="font-weight:400;color:var(--muted)">(doble clic en una venta para ver el detalle)</small></h3>
     <div class="tablewrap"><table class="lt"><thead><tr><th>Hora</th><th>Caja · cajero</th><th>Comprobante</th><th>Pago</th><th class="r">Total</th></tr></thead><tbody>
-    ${vs.slice(0,150).map(v=>`<tr data-mdv="${escH(v.caja)}|${v.nro}" style="cursor:pointer" title="Doble clic para ver el detalle"><td class="num">${escH((v.hora||"").slice(0,5))}</td><td>${escH(v.caja)} · ${escH(v.cajero)}</td><td>${v.nc?"<b style='color:var(--off)'>NC</b> ":""}${escH(v.comp)} #${v.nro}${v.clienteFA?" · "+escH(v.clienteFA.razon):v.cliente?" · "+escH(v.cliente):""}</td><td>${partes(v).map(p=>escH(p.medio)+(partes(v).length>1?" "+fmt(p.monto):"")).join(" + ")}</td><td class="r num">${fmt(v.total)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Sin ventas ese día.</td></tr>'}
+    ${vs.slice(0,150).map(v=>`<tr data-mdv="${escH(v.caja)}|${v.nro}" style="cursor:pointer" title="Doble clic para ver el detalle"><td class="num">${v._dia&&$("movPer").value!=="dia"?escH(v._dia.slice(8,10)+"/"+v._dia.slice(5,7))+" ":""}${escH((v.hora||"").slice(0,5))}</td><td>${escH(v.caja)} · ${escH(v.cajero)}</td><td>${v.nc?"<b style='color:var(--off)'>NC</b> ":""}${escH(v.comp)} #${v.nro}${v.clienteFA?" · "+escH(v.clienteFA.razon):v.cliente?" · "+escH(v.cliente):""}</td><td>${partes(v).map(p=>escH(p.medio)+(partes(v).length>1?" "+fmt(p.monto):"")).join(" + ")}</td><td class="r num">${fmt(v.total)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Sin ventas ese día.</td></tr>'}
     </tbody></table></div>`;
 }
 $("movDia").value=diaISO(new Date());
-$("movDia").addEventListener("change",()=>{ ventasNube=[]; movSuscribir($("movDia").value); pintarMov(); });
+function movRecargar(){ const per=$("movPer").value; ventasNube=[]; if(per==="dia") movSuscribir($("movDia").value); else movSuscribirRango(per,$("movDia").value); pintarMov(); }
+$("movDia").addEventListener("change",movRecargar); $("movPer").addEventListener("change",movRecargar);
 $("movRes").addEventListener("dblclick",e=>{ const r=e.target.closest("[data-mdv]"); if(r) verBoleta(r.dataset.mdv); });
 $("movQ").addEventListener("input",pintarMov); $("movCaja").addEventListener("change",pintarMov);
 pintarNube();
