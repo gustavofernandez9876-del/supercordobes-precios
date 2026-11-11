@@ -1874,13 +1874,14 @@ function pintarMov(){ const box=$("movRes"); if(!box) return;
     ${["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente",...Object.keys(med).filter(k=>!["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente"].includes(k))].map(k=>`<div class="panel" style="padding:10px"><div class="label">${k==="Cuenta corriente"?"Vendido a cuenta corriente":escH(k)}</div><b class="num" style="font-size:20px">${fmt(med[k]||0)}</b></div>`).join("")}
     <div class="panel" style="padding:10px"><div class="label">Cobros de cuentas corrientes</div><b class="num" style="font-size:20px">${fmt(cob)}</b></div></div>${prod}
     ${porCaja(vs)}${revisar(vs)}
-    <h3 style="margin:14px 0 6px">Últimos movimientos</h3>
+    <h3 style="margin:14px 0 6px">Últimos movimientos <small style="font-weight:400;color:var(--muted)">(doble clic en una venta para ver el detalle)</small></h3>
     <div class="tablewrap"><table class="lt"><thead><tr><th>Hora</th><th>Caja · cajero</th><th>Comprobante</th><th>Pago</th><th class="r">Total</th></tr></thead><tbody>
-    ${vs.slice(0,150).map(v=>`<tr><td class="num">${escH((v.hora||"").slice(0,5))}</td><td>${escH(v.caja)} · ${escH(v.cajero)}</td><td>${v.nc?"<b style='color:var(--off)'>NC</b> ":""}${escH(v.comp)} #${v.nro}${v.clienteFA?" · "+escH(v.clienteFA.razon):v.cliente?" · "+escH(v.cliente):""}</td><td>${partes(v).map(p=>escH(p.medio)+(partes(v).length>1?" "+fmt(p.monto):"")).join(" + ")}</td><td class="r num">${fmt(v.total)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Sin ventas ese día.</td></tr>'}
+    ${vs.slice(0,150).map(v=>`<tr data-mdv="${escH(v.caja)}|${v.nro}" style="cursor:pointer" title="Doble clic para ver el detalle"><td class="num">${escH((v.hora||"").slice(0,5))}</td><td>${escH(v.caja)} · ${escH(v.cajero)}</td><td>${v.nc?"<b style='color:var(--off)'>NC</b> ":""}${escH(v.comp)} #${v.nro}${v.clienteFA?" · "+escH(v.clienteFA.razon):v.cliente?" · "+escH(v.cliente):""}</td><td>${partes(v).map(p=>escH(p.medio)+(partes(v).length>1?" "+fmt(p.monto):"")).join(" + ")}</td><td class="r num">${fmt(v.total)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Sin ventas ese día.</td></tr>'}
     </tbody></table></div>`;
 }
 $("movDia").value=diaISO(new Date());
 $("movDia").addEventListener("change",()=>{ ventasNube=[]; movSuscribir($("movDia").value); pintarMov(); });
+$("movRes").addEventListener("dblclick",e=>{ const r=e.target.closest("[data-mdv]"); if(r) verBoleta(r.dataset.mdv); });
 $("movQ").addEventListener("input",pintarMov); $("movCaja").addEventListener("change",pintarMov);
 pintarNube();
 
@@ -1929,7 +1930,7 @@ function miDia(){
   $("mdSel").onchange=e=>{ mdCaja=e.target.value; miDia(); };
   $("modal").hidden=false; }
 $("btnMiDia").addEventListener("click",()=>{ mdCaja=null; miDia(); });
-function verBoleta(nro){ const [cj,nr]=String(nro).split("|"); const v=ventasHoyTodas().find(x=>x.caja===cj && x.nro==nr); if(!v) return;
+function verBoleta(nro){ const [cj,nr]=String(nro).split("|"); const v=ventasHoyTodas().find(x=>x.caja===cj && x.nro==nr)||(ventasNube||[]).find(x=>x.caja===cj && x.nro==nr); if(!v) return;
   $("ticket").innerHTML=`<h3>${v.nc?"Nota de crédito":escH(v.comp)} #${v.nro}</h3><div style="color:var(--muted)">${escH(v.fecha)} ${escH(v.hora)} · ${escH(v.caja)} · ${escH(v.cajero)}${v.cliente?" · "+escH(v.cliente):v.clienteFA?" · "+escH(v.clienteFA.razon):""}</div><hr>`+
    (v.items||[]).map(i=>`<div class="tl num"><span>${escH(i.q)} ${escH(i.desc)}</span><span>${fmt(i.importe)}</span></div>`).join("")+
    `<hr><div class="tl num" style="font-size:20px;font-weight:700"><span>TOTAL</span><span>${fmt(v.total)}</span></div><div class="tl"><span>Pago</span><span>${escH(v.pago)}</span></div>
