@@ -313,8 +313,8 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
       </div>
     </div>
 
-    <div class="cobrarBox"><label class="impChk"><input type="checkbox" id="chkImp"> Imprimir ticket</label><button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button><button class="btn" id="btnConsumo" type="button" style="margin-top:6px;width:100%">Consumo interno (sin cobrar)</button></div>
-<div id="cxModal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:flex;align-items:center;justify-content:center"><div style="background:var(--card,#fff);color:inherit;padding:18px;border-radius:10px;width:min(420px,92vw)"><h3 style="margin-top:0">Consumo interno</h3><div class="hint">Los productos del carrito se descuentan del stock sin cobrar. No suma a la caja ni va a ARCA.</div><label style="display:block;margin-top:10px">Motivo</label><select id="cxMot" style="width:100%"><option>Bolsas para la caja</option><option>Uso del local / limpieza</option><option>Vencido / roto / merma</option><option>Consumo del personal</option><option>Degustación / muestra</option><option>Otro</option></select><label style="display:block;margin-top:8px">Detalle (opcional)</label><input id="cxDet" type="text" style="width:100%" placeholder="Ej. bolsas para la caja 2"><div id="cxRes" class="hint" style="margin-top:8px"></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="cxNo" type="button" style="flex:1">Cancelar</button><button class="btn primary" id="cxOk" type="button" style="flex:1">Registrar consumo</button></div></div></div>
+    <div class="cobrarBox"><label class="impChk"><input type="checkbox" id="chkImp"> Imprimir ticket</label><button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button><button class="btn" id="btnConsumo" type="button" style="margin-top:6px;width:100%">Baja de productos (rotura / uso interno / faltante)</button></div>
+<div id="cxModal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:flex;align-items:center;justify-content:center"><div style="background:var(--card,#fff);color:inherit;padding:18px;border-radius:10px;width:min(420px,92vw)"><h3 style="margin-top:0">Baja de productos</h3><div class="hint">Los productos del carrito se descuentan del stock sin cobrar y quedan registrados como baja. No suma a la caja ni va a ARCA.</div><label style="display:block;margin-top:10px">Motivo</label><select id="cxMot" style="width:100%"><option>Roto / dañado</option><option>Vencido</option><option>Faltante (no está en góndola ni depósito)</option><option>Uso interno del local / limpieza</option><option>Bolsas para la caja</option><option>Consumo del personal</option><option>Degustación / muestra</option><option>Otro</option></select><label style="display:block;margin-top:8px">Detalle (opcional)</label><input id="cxDet" type="text" style="width:100%" placeholder="Ej. bolsas para la caja 2"><div id="cxRes" class="hint" style="margin-top:8px"></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="cxNo" type="button" style="flex:1">Cancelar</button><button class="btn primary" id="cxOk" type="button" style="flex:1">Registrar baja</button></div></div></div>
     <button class="btn" id="btnCancel" type="button">Cancelar venta</button>
 
     <div class="panel">
@@ -1284,14 +1284,14 @@ $("ccCli").addEventListener("change", e=>{ ccSel = e.target.value; render(); });
 $("btnPagoCC").addEventListener("click", pagarCC);
 $("btnPagoTotal").addEventListener("click", ()=>{ const c=CC.find(x=>x.id===$("pgCli").value); if (c) $("pgMonto").value=c.saldo; });
 $("btnCobrar").addEventListener("click", cobrar);
-$("btnConsumo").addEventListener("click",()=>{ if(!carrito.length){ aviso("Primero pasá los productos que se sacan para uso interno."); return; }
+$("btnConsumo").addEventListener("click",()=>{ if(!carrito.length){ aviso("Primero pasá los productos que se dan de baja."); return; }
   const val=carrito.reduce((a,l)=>a+calcLinea(l).lista,0); $("cxRes").textContent=carrito.length+" producto(s) · valor de lista "+fmt(Math.round(val)); $("cxDet").value=""; $("cxModal").hidden=false; });
 $("cxNo").addEventListener("click",()=>{ $("cxModal").hidden=true; $("scan").focus(); });
 $("cxOk").addEventListener("click",()=>{ if(!carrito.length) return;
   const items=carrito.map(l=>({cod:l.p.cod, desc:l.p.desc, q:l.q, importe:0, lista:Math.round(calcLinea(l).lista)}));
   const valor=items.reduce((a,i)=>a+i.lista,0), mot=$("cxMot").value+($("cxDet").value.trim()?" · "+$("cxDet").value.trim():"");
-  const v={nro:nro++, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, cajero:$("cajero").value.trim()||"Sin nombre", pago:"Consumo interno", pagos:null, comp:"Consumo interno", total:0, valorInterno:valor, motivo:mot, cliente:"", clienteFA:null, items};
-  ventas.push(v); guardar(); $("cxModal").hidden=true; nueva(); aviso("Consumo interno #"+v.nro+" registrado ("+mot+") · valor "+fmt(valor)); });
+  const v={nro:nro++, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, cajero:$("cajero").value.trim()||"Sin nombre", pago:"Baja", pagos:null, comp:"Consumo interno", baja:true, total:0, valorInterno:valor, motivo:mot, cliente:"", clienteFA:null, items};
+  ventas.push(v); guardar(); $("cxModal").hidden=true; nueva(); aviso("Baja #"+v.nro+" registrada ("+mot+") · valor "+fmt(valor)); });
 $("btnCancel").addEventListener("click", ()=>{ carrito=[]; ultimo=null; render(); aviso("Venta cancelada"); });
 $("modal").addEventListener("click", e=>{ if (e.target.id==="btnNueva") nueva(); if (e.target.id==="btnVolverNC"){ $("modal").hidden=true; $("scan").focus(); } });
 // Los porcentajes de descuento solo los cambia una persona autorizada.
@@ -1459,7 +1459,7 @@ function sistemaCaja(){
   return s;
 }
 function porComp(vs){ const m={"Factura B":0,"Factura A":0,"Remito interno":0}; let nc=0, ci=0; vs.forEach(v=>{ if(v.nc){ nc+=v.total; return; } if(v.comp==="Consumo interno"){ ci+=v.valorInterno||0; return; } m[v.comp]=(m[v.comp]||0)+v.total; }); return {m,nc,ci,total:Object.values(m).reduce((a,x)=>a+x,0)-nc}; }
-function htmlPorComp(pc){ return `<div class="label" style="margin-top:10px">Ventas del turno por comprobante</div>`+Object.keys(pc.m).map(k=>`<div class="tl num"><span>${k}</span><span>${fmt(pc.m[k])}</span></div>`).join("")+(pc.nc?`<div class="tl num"><span>Notas de crédito / devoluciones</span><span>−${fmt(pc.nc)}</span></div>`:"")+`<div class="tl num" style="font-weight:700"><span>TOTAL VENDIDO (facturas + remitos)</span><span>${fmt(pc.total)}</span></div>`+(pc.ci?`<div class="tl num" style="color:var(--muted)"><span>Consumo interno (no cobrado, a precio de lista)</span><span>${fmt(pc.ci)}</span></div>`:""); }
+function htmlPorComp(pc){ return `<div class="label" style="margin-top:10px">Ventas del turno por comprobante</div>`+Object.keys(pc.m).map(k=>`<div class="tl num"><span>${k}</span><span>${fmt(pc.m[k])}</span></div>`).join("")+(pc.nc?`<div class="tl num"><span>Notas de crédito / devoluciones</span><span>−${fmt(pc.nc)}</span></div>`:"")+`<div class="tl num" style="font-weight:700"><span>TOTAL VENDIDO (facturas + remitos)</span><span>${fmt(pc.total)}</span></div>`+(pc.ci?`<div class="tl num" style="color:var(--muted)"><span>Bajas de productos (no cobrado, a precio de lista)</span><span>${fmt(pc.ci)}</span></div>`:""); }
 function abrirCierre(){
   ciMovs=[]; $("ciQuien").value=$("cajero").value; $("ciFondo").value=fondosAb().length?totFondos():($("ciFondo").value||"");
   $("ciCab").innerHTML=`${$("caja").value} · turno ${$("turno").value} · ${hoy()} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`+htmlPorComp(porComp(abiertas()));
@@ -1786,7 +1786,7 @@ let coFiltro="todos";
 function pintarComprob(){
   const t=norm($("coQ").value.trim());
   const F={todos:()=>true, "Factura A":v=>v.comp==="Factura A", "Factura B":v=>v.comp==="Factura B", "Remito interno":v=>v.comp==="Remito interno", "Consumo interno":v=>v.comp==="Consumo interno", nc:v=>v.nc, cc:v=>v.pago==="Cuenta corriente"};
-  const nom={todos:"Todos","Factura A":"Factura A","Factura B":"Factura B","Remito interno":"Remito interno","Consumo interno":"Consumo interno",nc:"Notas de crédito",cc:"A cuenta corriente"};
+  const nom={todos:"Todos","Factura A":"Factura A","Factura B":"Factura B","Remito interno":"Remito interno","Consumo interno":"Bajas de productos",nc:"Notas de crédito",cc:"A cuenta corriente"};
   $("coChips").innerHTML=Object.keys(F).map(k=>`<button type="button" class="chip" data-f="${k}" aria-pressed="${coFiltro===k}">${nom[k]} <b>${ventas.filter(F[k]).length}</b></button>`).join("");
   const cli=v=>v.clienteFA?.razon||v.cliente||"Consumidor final";
   const filas=ventas.filter(F[coFiltro]).filter(v=>!t || String(v.nro).includes(t) || norm(cli(v)).includes(t) || norm(v.cajero).includes(t)).slice().reverse();
