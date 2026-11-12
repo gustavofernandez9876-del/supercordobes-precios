@@ -647,7 +647,7 @@ else if (false) { const otros=CC.filter(c=>!String(c.id).startsWith("fx")); cons
 try{ localStorage.setItem("cajaCC", JSON.stringify(CC)); localStorage.setItem("cajaCCver","fx3"); }catch(e){}
 const guardarCC = () => { try { localStorage.setItem("cajaCC", JSON.stringify(CC)); } catch(e) {} try{ window.__syncCC&&window.__syncCC(); }catch(e){} };
 // Cuentas habilitadas por Gustavo aunque tengan deuda vencida (no se cortan).
-const CC_HABILITADAS=["GASTON FERNANDEZ"];
+const CC_HABILITADAS=["GASTON FERNANDEZ","BELEN FERNANDEZ"];
 function estadoCC(c){
   if (c && CC_HABILITADAS.includes((c.nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim())){ c.autorizada=true; if(c.saldo>0) return {cls:"ok", txt:"Habilitada por Gustavo", dias:0, bloq:false}; }
   if (c && c.autorizada===false){ try{ if(teniaCC(c.nombre)) c.autorizada=true; }catch(e){} }
