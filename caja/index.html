@@ -214,6 +214,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnVencCel" type="button" onclick="location.hash='#venc';location.reload()">📱 App vencimientos</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
     <button class="btn" id="btnFondo" type="button">Ingreso de fondos</button>
+    <button class="btn" id="btnMigrar" type="button">Pasar ventas a la nube</button><input type="file" id="migFile" accept=".json,application/json" hidden>
     <button class="btn" id="btnCierre" type="button">Cerrar caja</button>
     <button class="btn" id="btnFull" type="button">Pantalla completa</button>
     <button class="btn primary" id="btnCliente" type="button">Pantalla cliente</button>
@@ -1873,6 +1874,44 @@ window.claude?.use?.("db").then(d=>{ if(!d) { pintarNube(); return; } NUBE=d; su
     else if(ccT>x.t) window.__syncCC(); });
   movSuscribir(diaISO(new Date()));
 }).catch(()=>pintarNube());
+
+// ===== Pasar las ventas de la caja vieja (sin nube) a la caja en la nube =====
+// En la caja vieja: descarga un archivo con todo y apaga su ARCA (para que no se pidan CAE dos veces).
+// En la caja de la nube: se elige ese archivo y se suben ventas, cobros, cierres, fondos y cuentas corrientes.
+$("btnMigrar").addEventListener("click", ()=>{
+  if(!NUBE){
+    const caja=$("caja").value||"Caja";
+    const data={v:1, caja, maq:MAQ, exportado:new Date().toISOString(), ventas, cobros, cierres, fondos:FONDOS, cc:CC, ccT, arca:ARCA};
+    const blob=new Blob([JSON.stringify(data)],{type:"application/json"}); const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=`${slug(caja)}_ventas_${diaISO(new Date())}.json`; document.body.appendChild(a); a.click(); a.remove();
+    ARCA.on=false; arcaGuardar();
+    aviso(`Archivo descargado (${ventas.length} ventas). Esta caja dejó de pedir CAE: ahora lo hace la caja en la nube. Abrí la caja en claude.ai, tocá "Pasar ventas a la nube" y elegí el archivo de la carpeta Descargas.`);
+    return; }
+  $("migFile").value=""; $("migFile").click(); });
+$("migFile").addEventListener("change", async e=>{ const fl=e.target.files[0]; if(!fl) return; let d;
+  try{ d=JSON.parse(await fl.text()); }catch(err){ aviso("Ese archivo no es de la caja."); return; }
+  if(!d||!Array.isArray(d.ventas)){ aviso("Ese archivo no es de la caja."); return; }
+  const dia=x=>{ const p=String(x||"").split("/"); return p.length===3?`${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`:diaISO(new Date()); };
+  const ya=new Set(ventas.map(v=>v.caja+"|"+v.nro+"|"+v.fecha)); let nv=0, nc=0;
+  d.ventas.forEach(v=>{ const k=v.caja+"|"+v.nro+"|"+v.fecha; if(ya.has(k)) return; ya.add(k);
+    v.dia=v.dia||dia(v.fecha); v.id=v.id||(slug(v.caja||d.caja)+"-vieja-"+v.dia+"-"+v.nro); v.migrada=true;
+    Array.prototype.push.call(ventas,v); aNube("ventas",v); nv++; });
+  ventas.sort((a,b)=>(a.ts||0)-(b.ts||0)); guardar();
+  const yc=new Set(cobros.map(c=>c.fecha+"|"+c.hora+"|"+c.cliente+"|"+c.monto));
+  (d.cobros||[]).forEach(c=>{ const k=c.fecha+"|"+c.hora+"|"+c.cliente+"|"+c.monto; if(yc.has(k)) return; yc.add(k);
+    c.dia=c.dia||dia(c.fecha); c.id=c.id||(slug(c.caja||d.caja)+"-vieja-c-"+c.dia+"-"+String(c.hora||"").replace(/\D/g,"")+"-"+Math.round(c.monto||0)); Array.prototype.push.call(cobros,c); aNube("cobros",c); nc++; });
+  try{ localStorage.setItem("cajaCobrosCC",JSON.stringify(cobros)); }catch(err){}
+  const yci=new Set(cierres.map(c=>JSON.stringify([c.caja,c.turno,c.fecha,c.hora])));
+  (d.cierres||[]).forEach(c=>{ const k=JSON.stringify([c.caja,c.turno,c.fecha,c.hora]); if(yci.has(k)) return; yci.add(k); cierres.push(c); aNube("cierres",{...c, dia:dia(c.fecha)}); });
+  try{ localStorage.setItem("cajaCierres",JSON.stringify(cierres)); }catch(err){}
+  const yf=new Set(FONDOS.map(x=>JSON.stringify(x))); (d.fondos||[]).forEach(x=>{ if(!yf.has(JSON.stringify(x))) FONDOS.push(x); }); guardarFondos();
+  // Cuentas corrientes: por cada cuenta se queda la versión con más movimientos.
+  if(Array.isArray(d.cc)){ d.cc.forEach(o=>{ const i=CC.findIndex(c=>c.id===o.id); if(i<0){ CC.push(o); return; } if((o.movs||[]).length>(CC[i].movs||[]).length) CC[i]=o; }); guardarCC(); }
+  // ARCA: si la caja vieja lo tenía prendido, se prende acá con el mismo punto de venta.
+  if(d.arca&&d.arca.pv){ ARCA.pv=d.arca.pv; ARCA.on=true; arcaGuardar(); }
+  nro=Math.max(nro,(ventas.reduce((m,v)=>Math.max(m,+v.nro||0),0))+1);
+  try{ render(); }catch(err){} try{ pintarMov(); }catch(err){} try{ arcaAviso(); }catch(err){}
+  aviso(`Listo: ${nv} ventas y ${nc} cobros de ${d.caja} pasados a la nube. Las facturas sin CAE se piden desde esta caja.`); });
 // ===== Vista Movimientos (para ver desde el teléfono) =====
 let movUnsub=null, movCobUnsub=null, movCobros=[], movDia="";
 const INICIO_SIS="2026-11-11"; let movMulti=[];
