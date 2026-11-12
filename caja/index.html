@@ -420,7 +420,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
       <h3 id="ctaTit">Cuentas corrientes</h3>
       <button class="del" id="ctaX" type="button" aria-label="Cerrar">×</button>
     </div>
-    <div class="est warn" style="margin:8px 0">Regla: a los <b>30 días</b> de la primera compra impaga la cuenta queda <b>CORTADA</b>. No se le puede vender a cuenta hasta que pague el saldo completo. Los pagos parciales no reinician el plazo.</div>
+    <div class="est warn" style="margin:8px 0">Regla: la cuenta muestra los días desde la primera compra impaga (vence a los <b>30 días</b>) pero <b>no se corta sola</b>: solo se bloquea si Gustavo lo ordena. Los clientes que ya tenían cuenta pueden seguir sacando aunque estén en cero.</div>
     <div id="ctaRes" style="font-size:13px;margin-bottom:8px"></div>
     <div class="chips" id="ctaChips" style="margin-bottom:6px"><button type="button" class="chip" data-cf="todas" aria-pressed="true">Todas</button><button type="button" class="chip" data-cf="cortadas" aria-pressed="false">Cortadas (+30 días)</button><button type="button" class="chip" data-cf="mes" aria-pressed="false">Con boletas de este mes</button></div>
     <input id="ctaBus" placeholder="Buscar cliente…" autocomplete="off" style="width:100%;margin-bottom:6px">
@@ -648,14 +648,17 @@ try{ localStorage.setItem("cajaCC", JSON.stringify(CC)); localStorage.setItem("c
 const guardarCC = () => { try { localStorage.setItem("cajaCC", JSON.stringify(CC)); } catch(e) {} try{ window.__syncCC&&window.__syncCC(); }catch(e){} };
 // Cuentas habilitadas por Gustavo aunque tengan deuda vencida (no se cortan).
 const CC_HABILITADAS=["GASTON FERNANDEZ","BELEN FERNANDEZ"];
+// Solo se cortan las cuentas que Gustavo ordena bloquear (nombre en mayúsculas sin acentos).
+const CC_BLOQUEADAS=[];
 function estadoCC(c){
+  if (c && (c.bloqueada || CC_BLOQUEADAS.includes((c.nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim()))) return {cls:"bloq", txt:"Bloqueada por Gustavo", dias:0, bloq:true};
   if (c && CC_HABILITADAS.includes((c.nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim())){ c.autorizada=true; if(c.saldo>0) return {cls:"ok", txt:"Habilitada por Gustavo", dias:0, bloq:false}; }
   if (c && c.autorizada===false){ try{ if(teniaCC(c.nombre)) c.autorizada=true; }catch(e){} }
   if (c && c.autorizada===false) return {cls:"bloq", txt:"SIN AUTORIZAR", dias:0, bloq:true, pend:true};
   if (!c || c.saldo<=0) return {cls:"ok", txt:"Al día", dias:0, bloq:false};
   // El día de la compra cuenta como día 1; el día 30 es el último para pagar y el 31 se corta.
   const d = diasDesde(c.desde)+1, resta = PLAZO_CC-d;
-  if (resta < 0) return {cls:"bloq", txt:"Cortada", dias:d, bloq:true};
+  if (resta < 0) return {cls:"warn", txt:`Vencida hace ${-resta} días · día ${d}`, dias:d, bloq:false};
   return {cls: resta<=5?"warn":"ok", txt: (resta===0?"Vence hoy":`Vence en ${resta} días`)+` · día ${d} de ${PLAZO_CC}`, dias:d, bloq:false};
 }
 let ccSel = "";
@@ -939,7 +942,7 @@ function render(flash){
   if (esCC){
     if (!cli) $("ccEstado").innerHTML = `<div class="est warn">Elegí el cliente para poder cobrar a cuenta.</div>`;
     else if (ec.pend) $("ccEstado").innerHTML = `<div class="est bloq"><b>Cuenta corriente NUEVA sin autorizar.</b> Llamá a Gustavo: él la habilita desde su teléfono (Cuentas corrientes → Pendientes de autorizar). Hasta entonces no se puede vender a cuenta. <button class="btn" type="button" data-autcc="${cli.id}">Autorizar (clave de Gustavo)</button></div>`;
-    else if (ec.bloq) $("ccEstado").innerHTML = `<div class="est bloq"><b>Cuenta cortada.</b> Debe ${fmt(cli.saldo)} desde hace ${ec.dias} días. No puede retirar hasta cancelar el saldo completo.</div>`;
+    else if (ec.bloq) $("ccEstado").innerHTML = `<div class="est bloq"><b>Cuenta bloqueada por Gustavo.</b> No puede retirar a cuenta.</div>`;
     else $("ccEstado").innerHTML = `<div class="est ${ec.cls}">Saldo actual ${fmt(cli.saldo)} · ${cli.saldo>0?ec.txt:"sin deuda, el plazo arranca con esta compra"}<br>${ccSplit?`Va a la cuenta: <b>${fmt(ccMonto)}</b> · `:""}Saldo después de esta venta: <b>${fmt(cli.saldo+ccMonto)}</b></div>`;
   }
   const esA = comp==="Factura A", esB = comp==="Factura B";
@@ -979,7 +982,7 @@ function deudaHTML(c){
   if (!c) return "";
   const e=estadoCC(c);
   if (c.saldo<=0) return `<div class="est ok" style="margin-top:6px">Tiene cuenta corriente: <b>sin deuda</b>.</div>`;
-  if (e.bloq) return `<div class="est bloq" style="margin-top:6px"><b>CUENTA CORTADA.</b> Debe ${fmt(c.saldo)} desde hace ${e.dias} días. No puede llevar a cuenta hasta pagar todo.</div>`;
+  if (e.bloq) return `<div class="est bloq" style="margin-top:6px"><b>CUENTA BLOQUEADA por Gustavo.</b> No puede llevar a cuenta.</div>`;
   return `<div class="est warn" style="margin-top:6px"><b>Tiene deuda en cuenta corriente: ${fmt(c.saldo)}</b> · ${e.txt}</div>`;
 }
 async function autorizarCC(id){ const c=CC.find(x=>x.id===id); if(!c) return;
