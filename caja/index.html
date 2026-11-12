@@ -988,9 +988,9 @@ function renderCtas(){
   const t=normN($("ctaBus").value);
   const ws=t.split(" ").filter(Boolean); const mesAct=diaISO(new Date()).slice(0,7);
   const pasaF=c=> ctaF==="cortadas" ? estadoCC(c).bloq : ctaF==="mes" ? ((c.boletas||[]).some(b=>b.fecha.slice(0,7)===mesAct) || ventas.some(v=>v.cliente===c.nombre && v.fecha && v.fecha.slice(3)===mesAct.slice(5)+"/"+mesAct.slice(0,4))) : true;
-  const lista=CC.filter(c=>{ const n=normN(c.nombre); return c.saldo>0 && pasaF(c) && ws.every(w=>n.includes(w)); }).slice().sort((a,b)=>b.saldo-a.saldo);
+  const lista=CC.filter(c=>{ const n=normN(c.nombre); return (c.saldo>0 || ctaF==="todas") && pasaF(c) && ws.every(w=>n.includes(w)); }).slice().sort((a,b)=>(b.saldo-a.saldo)||a.nombre.localeCompare(b.nombre));
   const cort=CC.filter(c=>estadoCC(c).bloq), porV=CC.filter(c=>{const e=estadoCC(c);return !e.bloq&&e.cls==="warn";});
-  $("ctaRes").innerHTML=`${CC.filter(c=>c.saldo>0).length} cuentas con saldo · total ${fmt(CC.reduce((a,c)=>a+Math.max(0,c.saldo),0))} · <b style="color:var(--off)">${cort.length} cortadas</b> · ${porV.length} vencen en 5 días o menos`;
+  $("ctaRes").innerHTML=`${CC.length} cuentas · ${CC.filter(c=>c.saldo>0).length} con saldo · total ${fmt(CC.reduce((a,c)=>a+Math.max(0,c.saldo),0))} · <b style="color:var(--off)">${cort.length} cortadas</b> · ${porV.length} vencen en 5 días o menos`;
   const pendA=CC.filter(c=>c.autorizada===false);
   const pendHtml=pendA.length?`<div class="est bloq" style="display:block;margin-bottom:6px"><b>Pendientes de autorizar (${pendA.length})</b>${pendA.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px"><span>${c.nombre}${c.tel?" · "+c.tel:""}${c.pidio?" · pidió "+c.pidio:""}</span><button class="btn primary" type="button" data-autcc="${c.id}">Autorizar</button></div>`).join("")}</div>`:"";
   $("ctaList").innerHTML = pendHtml + lista.map(c=>{const e=estadoCC(c);
