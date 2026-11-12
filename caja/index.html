@@ -1902,8 +1902,15 @@ function revisar(vs){ const r=[];
   movAlertas.forEach(a=>r.push([Date.parse(a.fecha)||0,`<b style="color:var(--off)">${a.tipo==="modificacion"?"Modificación:":"Clave incorrecta:"}</b> ${escH(a.tipo==="modificacion"?a.accion.replace(/^Modificación de venta: /,""):a.accion)}`,`${escH((a.hora||"").slice(0,5))} · ${escH(a.caja)} · ${escH(a.responsable)}`]));
   r.sort((a,b)=>b[0]-a[0]);
   return `<h3 style="margin:14px 0 6px">Para revisar ${r.length?`<span style="color:var(--off)">(${r.length})</span>`:""}</h3>`+(r.length?`<div class="tablewrap"><table class="lt"><tbody>${r.slice(0,80).map(x=>`<tr><td>${x[1]}</td><td class="hint">${x[2]}</td></tr>`).join("")}</tbody></table></div>`:'<div class="hint">Nada raro por ahora.</div>'); }
+window.__movVN=()=>ventasNube; window.__movCob=()=>movCobros;
+function fISO(f){ const p=String(f||"").split("/"); return p.length===3?`${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`:""; }
+function movDiasSel(){ const per=$("movPer")?$("movPer").value:"dia", dia=$("movDia").value||diaISO(new Date()); return per==="dia"?[dia]:diasRango(per,dia); }
+function movLocal(){ const ds=new Set(movDiasSel()); return ventas.filter(v=>ds.has(fISO(v.fecha))).map(v=>({...v,_dia:fISO(v.fecha)})); }
+function movLocalCob(){ const ds=new Set(movDiasSel()); return (typeof cobros!=="undefined"?cobros:[]).filter(c=>ds.has(fISO(c.fecha))); }
 function pintarMov(){ const box=$("movRes"); if(!box) return;
-  if(!NUBE){ box.innerHTML='<div class="hint">La nube no está disponible en este dispositivo. Abrí la Caja con tu usuario de Claude.</div>'; return; }
+  // Sin nube: se muestran las ventas guardadas en esta compu
+  const ventasNube=NUBE?window.__movVN():movLocal(); const movCobros=NUBE?window.__movCob():movLocalCob();
+  const avisoLocal=NUBE?"":'<div class="hint" style="color:var(--off)">Sin nube: se ven solo las ventas de esta compu. Para ver las dos cajas juntas, abrí la Caja con tu usuario de Claude.</div>';
   const q=norm(($("movQ").value||"").trim()), cajaF=$("movCaja").value;
   let vs=ventasNube.filter(v=>!cajaF||v.caja===cajaF).sort((a,b)=>(b.ts||0)-(a.ts||0));
   const cajas=[...new Set(ventasNube.map(v=>v.caja))].sort(); const sel=$("movCaja"); const prev=sel.value;
@@ -1914,7 +1921,7 @@ function pintarMov(){ const box=$("movRes"); if(!box) return;
   if(q.length>=2){ const m={}; vs.forEach(v=>(v.items||[]).forEach(i=>{ if(!norm(i.desc||"").includes(q) && i.cod!==q) return; const k=i.desc; m[k]=m[k]||{q:0,imp:0,n:0}; const sg=v.nc?-1:1; m[k].q+=sg*(+i.q||0); m[k].imp+=sg*(i.importe||0); m[k].n++; }));
     const ks=Object.keys(m).sort((a,b)=>m[b].imp-m[a].imp);
     prod=`<h3 style="margin:14px 0 6px">Producto: “${escH($("movQ").value)}”</h3>`+(ks.length?`<table class="lt"><thead><tr><th>Producto</th><th class="r">Unid.</th><th class="r">Importe</th></tr></thead><tbody>${ks.map(k=>`<tr><td>${escH(k)}</td><td class="r num">${m[k].q.toLocaleString("es-AR")}</td><td class="r num">${fmt(m[k].imp)}</td></tr>`).join("")}</tbody></table>`:'<div class="hint">No se vendió ese día.</div>'); }
-  box.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0">
+  box.innerHTML=avisoLocal+`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0">
     <div class="panel" style="padding:10px"><div class="label">Ventas</div><b class="num" style="font-size:22px">${fmt(tot)}</b><div class="hint">${vs.length} comprobantes${nc?` · ${nc} NC`:""}</div></div>
     ${["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente",...Object.keys(med).filter(k=>!["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente"].includes(k))].map(k=>`<div class="panel" style="padding:10px"><div class="label">${k==="Cuenta corriente"?"Vendido a cuenta corriente":escH(k)}</div><b class="num" style="font-size:20px">${fmt(med[k]||0)}</b></div>`).join("")}
     ${(()=>{ const fa=vs.filter(v=>v.comp==="Factura A"||v.comp==="Nota de crédito A").reduce((a,v)=>a+(v.nc?-1:1)*v.total,0), fb=vs.filter(v=>v.comp==="Factura B"||v.comp==="Nota de crédito B").reduce((a,v)=>a+(v.nc?-1:1)*v.total,0), ri=vs.filter(v=>v.comp==="Remito interno").reduce((a,v)=>a+v.total,0);
