@@ -990,8 +990,24 @@ function renderCtas(){
   const pendA=CC.filter(c=>c.autorizada===false);
   const pendHtml=pendA.length?`<div class="est bloq" style="display:block;margin-bottom:6px"><b>Pendientes de autorizar (${pendA.length})</b>${pendA.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px"><span>${c.nombre}${c.tel?" · "+c.tel:""}${c.pidio?" · pidió "+c.pidio:""}</span><button class="btn primary" type="button" data-autcc="${c.id}">Autorizar</button></div>`).join("")}</div>`:"";
   $("ctaList").innerHTML = pendHtml + lista.map(c=>{const e=estadoCC(c);
-    return `<div data-cta="${c.id}" style="cursor:pointer;flex-wrap:wrap" title="Tocá para ver el detalle"><span>▸ ${c.nombre}${c.tel?` <small>· ${c.tel}</small>`:""}<br><small>${c.saldo>0&&c.desde?`desde ${new Date(c.desde+"T12:00").toLocaleDateString("es-AR")} · día ${e.dias} de 30`:"sin saldo"}</small></span><span style="text-align:right"><b>${fmt(c.saldo)}</b><br><span class="pill ${e.cls}">${e.txt}</span></span></div>`;}).join("") || '<div>No hay clientes con ese nombre.</div>';
+    return `<div data-cta="${c.id}" style="cursor:pointer;flex-wrap:wrap" title="Tocá para ver el detalle"><span>▸ ${c.nombre}${c.tel?` <small>· ${c.tel}</small>`:""}<br><small>${c.saldo>0&&c.desde?`desde ${new Date(c.desde+"T12:00").toLocaleDateString("es-AR")} · día ${e.dias} de 30`:"sin saldo"}</small></span><span style="text-align:right"><b>${fmt(c.saldo)}</b><br><span class="pill ${e.cls}">${e.txt}</span></span></div>`;}).join("");
+  // Clientes sin deuda que coinciden con la búsqueda: muestran su historial de compras
+  let extra="";
+  if(ws.length){ const ya=new Set(lista.map(c=>normN(c.nombre)));
+    const otros=CLIENTES_RI.filter(c=>{ const n=normN(c.razon||""); return !ya.has(n) && (ws.every(w=>n.includes(w)) || (c.cuit&&String(c.cuit).includes(t.replace(/\D/g,"")) && t.replace(/\D/g,"").length>=4)); }).slice(0,15);
+    extra=otros.map(c=>`<div data-hcli="${escH(c.cod)}" style="cursor:pointer;flex-wrap:wrap" title="Tocá para ver el historial"><span>▸ ${escH(c.razon)}<br><small>${escH(idCli(c))} · ${escH(c.cond||"")}</small></span><span style="text-align:right"><b>${fmt(0)}</b><br><span class="pill ok">sin deuda</span></span></div>`).join(""); }
+  if(!$("ctaList").innerHTML.replace(pendHtml,"") && !extra) $("ctaList").innerHTML=pendHtml+'<div>No hay clientes con ese nombre.</div>'; else $("ctaList").innerHTML+=extra;
 }
+function ventasDeCliente(c){ const n=normN(c.razon||c.nombre||""), cu=String(c.cuit||"").replace(/\D/g,"");
+  const todas=ventas.concat(window.__vn||[],ventasNube||[]); const vistos=new Set();
+  return todas.filter(v=>{ const k=v.caja+"|"+v.nro+"|"+v.fecha; if(vistos.has(k)) return false;
+    const ok=(v.clienteFA&&((cu&&String(v.clienteFA.cuit||"").replace(/\D/g,"")===cu)||(v.clienteFA.cod&&v.clienteFA.cod===c.cod)||normN(v.clienteFA.razon||"")===n))||(v.cliente&&normN(v.cliente)===n);
+    if(ok) vistos.add(k); return ok; }); }
+function historialCli(c){ const vs=ventasDeCliente(c);
+  const tot=vs.reduce((a,v)=>a+(v.nc?-v.total:v.total),0);
+  return `<div class="ctaDet" style="display:block;width:100%;background:var(--soft);border-radius:8px;padding:8px;margin-top:6px"><div class="est ok" style="margin:6px 0"><b>Sin deuda</b> · ${vs.length} compras registradas en el sistema · total ${fmt(tot)}</div>`+
+   (vs.length?vs.slice().reverse().map(v=>`<div data-mdv="${escH(v.caja)}|${escH(v.nro)}" title="Doble clic para ver / reimprimir" style="display:block;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:4px 0;cursor:pointer"><div style="display:flex;justify-content:space-between;border:0;padding:0"><b>${v.nc?"Nota de crédito":escH(v.comp)} #${v.nro} · ${escH(v.fecha)}</b><b>${fmt(v.total)}</b></div><small>${escH(v.pago)} · ${escH(v.caja)} · ${escH(v.cajero)}${v.pago==="Cuenta corriente"?" · a cuenta":" · PAGADA"}</small></div>`).join("")
+   :'<div style="color:var(--muted)">No hay compras de este cliente en el sistema nuevo. Las anteriores están en Flexxus.</div>')+`</div>`; }
 $("btnCtas").addEventListener("click", ()=>{ $("ctaBus").value=""; renderCtas(); $("ctaModal").hidden=false; $("ctaBus").focus(); });
 $("ctaX").addEventListener("click", ()=>{ $("ctaModal").hidden=true; });
 function detalleCta(c){
@@ -1034,7 +1050,9 @@ function imprimirBoletasCC(c){
   document.body.appendChild(f); f.contentDocument.open(); f.contentDocument.write(h); f.contentDocument.close();
   setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ aviso("No se pudo imprimir"); } },150);
 }
-$("ctaList").addEventListener("click", ev=>{ const ib=ev.target.closest("[data-impcc]"); if(ib){ ev.stopPropagation(); const c=CC.find(x=>x.id===ib.dataset.impcc); if(c) imprimirBoletasCC(c); return; } const cb=ev.target.closest("[data-cobrar]"); if(cb){ ev.stopPropagation(); abrirCobro(cb.dataset.cobrar); return; } if(ev.target.closest(".ctaDet")) return; const r=ev.target.closest("[data-cta]"); if(!r) return;
+$("ctaList").addEventListener("click", ev=>{ const hc=ev.target.closest("[data-hcli]"); if(hc && !ev.target.closest(".ctaDet")){ const d=hc.querySelector(".ctaDet"); if(d){ d.remove(); return; } const c=CLIENTES_RI.find(x=>String(x.cod)===hc.dataset.hcli); if(c) hc.insertAdjacentHTML("beforeend", historialCli(c)); return; } });
+$("ctaList").addEventListener("dblclick", ev=>{ const r=ev.target.closest(".ctaDet [data-mdv]"); if(r){ ev.stopPropagation(); verBoleta(r.dataset.mdv); } });
+$("ctaList").addEventListener("click", ev=>{ if(ev.target.closest("[data-hcli]")) return; const ib=ev.target.closest("[data-impcc]"); if(ib){ ev.stopPropagation(); const c=CC.find(x=>x.id===ib.dataset.impcc); if(c) imprimirBoletasCC(c); return; } const cb=ev.target.closest("[data-cobrar]"); if(cb){ ev.stopPropagation(); abrirCobro(cb.dataset.cobrar); return; } if(ev.target.closest(".ctaDet")) return; const r=ev.target.closest("[data-cta]"); if(!r) return;
   const d=r.querySelector(".ctaDet"); if(d){ d.remove(); return; }
   const c=CC.find(x=>x.id===r.dataset.cta); if(c) r.insertAdjacentHTML("beforeend", detalleCta(c)); });
 function abrirCuenta(id){ const c=CC.find(x=>x.id===id); if(!c) return; $("ctaBus").value=""; ctaF="todas"; [...$("ctaChips").children].forEach(x=>x.setAttribute("aria-pressed",x.dataset.cf==="todas")); renderCtas(); $("ctaModal").hidden=false; const r=[...$("ctaList").querySelectorAll("[data-cta]")].find(x=>x.dataset.cta===id); if(r){ if(!r.querySelector(".ctaDet")) r.insertAdjacentHTML("beforeend", detalleCta(c)); r.scrollIntoView({block:"start"}); } }
@@ -1956,7 +1974,7 @@ function miDia(){
   $("mdSel").onchange=e=>{ mdCaja=e.target.value; miDia(); };
   $("modal").hidden=false; }
 $("btnMiDia").addEventListener("click",()=>{ mdCaja=null; miDia(); });
-function verBoleta(nro){ const [cj,nr]=String(nro).split("|"); const v=ventasHoyTodas().find(x=>x.caja===cj && x.nro==nr)||(ventasNube||[]).find(x=>x.caja===cj && x.nro==nr); if(!v) return;
+function verBoleta(nro){ const [cj,nr]=String(nro).split("|"); const v=ventasHoyTodas().find(x=>x.caja===cj && x.nro==nr)||(ventasNube||[]).find(x=>x.caja===cj && x.nro==nr)||ventas.concat(window.__vn||[]).find(x=>x.caja===cj && x.nro==nr); if(!v) return;
   $("ticket").innerHTML=`<h3>${v.nc?"Nota de crédito":escH(v.comp)} #${v.nro}</h3><div style="color:var(--muted)">${escH(v.fecha)} ${escH(v.hora)} · ${escH(v.caja)} · ${escH(v.cajero)}${v.cliente?" · "+escH(v.cliente):v.clienteFA?" · "+escH(v.clienteFA.razon):""}</div><hr>`+
    (v.items||[]).map(i=>`<div class="tl num"><span>${escH(i.q)} ${escH(i.desc)}</span><span>${fmt(i.importe)}</span></div>`).join("")+
    `<hr><div class="tl num" style="font-size:20px;font-weight:700"><span>TOTAL</span><span>${fmt(v.total)}</span></div><div class="tl"><span>Pago</span><span>${escH(v.pago)}</span></div>
