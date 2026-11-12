@@ -4542,7 +4542,9 @@ function arcaPayload(v){
   if(c){ const cuit=String(c.cuit||"").replace(/\D/g,""), dni=String(c.doc||"").replace(/\D/g,"");
     if(cuit){ docTipo=80; docNro=cuit; } else if(dni){ docTipo=96; docNro=dni; }
     cond = COND[c.cond] || (esA?1:5); }
-  if(esA) cond=1;
+  // Condiciones IVA válidas por clase (FEParamGetCondicionIvaReceptor): A → 1,6,13,16; B → 4,5,6,7,8,9,10,13,15,16
+  if(esA){ if(![1,6,13,16].includes(cond)) cond=1; }
+  else if(![4,5,6,7,8,9,10,13,15,16].includes(cond)){ cond=5; if(v.total<10000000){ docTipo=99; docNro=0; } }
   return {pv:+ARCA.pv, tipo: esA?1:6, docTipo, docNro, condIva:cond, total:v.total, items:v.items.map(i=>({importe:i.importe, iva:ivaDe(i.cod)}))};
 }
 async function arcaPedir(v,imprimir){
