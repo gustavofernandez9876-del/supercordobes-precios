@@ -1903,10 +1903,10 @@ function revisar(vs){ const r=[];
   r.sort((a,b)=>b[0]-a[0]);
   return `<h3 style="margin:14px 0 6px">Para revisar ${r.length?`<span style="color:var(--off)">(${r.length})</span>`:""}</h3>`+(r.length?`<div class="tablewrap"><table class="lt"><tbody>${r.slice(0,80).map(x=>`<tr><td>${x[1]}</td><td class="hint">${x[2]}</td></tr>`).join("")}</tbody></table></div>`:'<div class="hint">Nada raro por ahora.</div>'); }
 window.__movVN=()=>ventasNube; window.__movCob=()=>movCobros;
-function fISO(f){ const p=String(f||"").split("/"); return p.length===3?`${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`:""; }
+function fechaISOmov(f){ const p=String(f||"").split("/"); return p.length===3?`${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`:""; }
 function movDiasSel(){ const per=$("movPer")?$("movPer").value:"dia", dia=$("movDia").value||diaISO(new Date()); return per==="dia"?[dia]:diasRango(per,dia); }
-function movLocal(){ const ds=new Set(movDiasSel()); return ventas.filter(v=>ds.has(fISO(v.fecha))).map(v=>({...v,_dia:fISO(v.fecha)})); }
-function movLocalCob(){ const ds=new Set(movDiasSel()); return (typeof cobros!=="undefined"?cobros:[]).filter(c=>ds.has(fISO(c.fecha))); }
+function movLocal(){ const ds=new Set(movDiasSel()); return ventas.filter(v=>ds.has(fechaISOmov(v.fecha))).map(v=>({...v,_dia:fechaISOmov(v.fecha)})); }
+function movLocalCob(){ const ds=new Set(movDiasSel()); return (typeof cobros!=="undefined"?cobros:[]).filter(c=>ds.has(fechaISOmov(c.fecha))); }
 function pintarMov(){ const box=$("movRes"); if(!box) return;
   // Sin nube: se muestran las ventas guardadas en esta compu
   const ventasNube=NUBE?window.__movVN():movLocal(); const movCobros=NUBE?window.__movCob():movLocalCob();
