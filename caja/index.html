@@ -4533,8 +4533,8 @@ $("arcaPV").addEventListener("change",()=>{ ARCA.pv=$("arcaPV").value; arcaGuard
 $("arcaProbar").addEventListener("click",async()=>{ $("arcaEst").textContent="Probando…";
   try{ const j=await (await fetch(ARCA_URL+"/ultimo?pv="+ARCA.pv+"&tipo=6")).json(); $("arcaEst").textContent = j.ok ? `Conectado a ARCA ✓ · PV ${ARCA.pv} · última Factura B: ${j.nro}` : "ARCA respondió con error: "+(j.error||""); }
   catch(e){ $("arcaEst").textContent="No responde el Servicio ARCA de esta computadora. Abrí INICIAR_SERVICIO_ARCA."; } });
-function arcaPend(){ const n=ventas.filter(v=>v.arca&&v.arca.pendiente).length; $("arcaEst").textContent = n ? `${n} venta(s) con CAE pendiente.` : "Sin CAE pendientes."; return n; }
-$("arcaReint").addEventListener("click",async()=>{ for(const v of ventas.filter(v=>v.arca&&v.arca.pendiente)){ await arcaPedir(v,false); } arcaPend(); });
+function arcaPend(){ const p=ventas.filter(v=>v.arca&&v.arca.pendiente), n=p.length; const errs=[...new Set(p.map(v=>v.arca.error).filter(Boolean))].slice(0,3); $("arcaEst").textContent = n ? `${n} venta(s) con CAE pendiente. Se reintenta solo cada 2 minutos.${errs.length?" Último error: "+errs.join(" / "):""}` : "Sin CAE pendientes."; return n; }
+$("arcaReint").addEventListener("click",async()=>{ for(const v of ventas.filter(v=>v.arca&&v.arca.pendiente)){ await arcaPedir(v,false); } arcaPend(); arcaAviso(); });
 const COND={"IVA Responsable Inscripto":1,"Responsable Inscripto":1,"IVA Sujeto Exento":4,"Exento":4,"Consumidor Final":5,"Responsable Monotributo":6,"Monotributo":6};
 function ivaDe(cod){ const p=PRODUCTOS.find(x=>x.cod===cod); if(p&&p.iva!=null) return +p.iva; return p&&p.fv?10.5:21; }
 function arcaPayload(v){
@@ -4547,11 +4547,21 @@ function arcaPayload(v){
   else if(![4,5,6,7,8,9,10,13,15,16].includes(cond)){ cond=5; if(v.total<10000000){ docTipo=99; docNro=0; } }
   return {pv:+ARCA.pv, tipo: esA?1:6, docTipo, docNro, condIva:cond, total:v.total, items:v.items.map(i=>({importe:i.importe, iva:ivaDe(i.cod)}))};
 }
+let arcaSilencio=false, arcaCorriendo=false;
+// Reintento automático cada 2 minutos de los CAE pendientes + aviso si alguno pasa de 24 h.
+async function arcaAuto(){ if(!ARCA.on || arcaCorriendo) return; const pend=ventas.filter(v=>v.arca&&v.arca.pendiente); if(pend.length){ arcaCorriendo=true; arcaSilencio=true;
+    for(const v of pend){ await arcaPedir(v,false); } arcaSilencio=false; arcaCorriendo=false; }
+  arcaAviso(); }
+function arcaAviso(){ const pend=ventas.filter(v=>v.arca&&v.arca.pendiente); const n=pend.length; const viejo=n?Math.min(...pend.map(v=>v.arca.desde||v.ts||Date.now())):0; const hs=n?Math.floor((Date.now()-viejo)/3600000):0;
+  const b=$("btnArca"); if(b){ b.textContent="ARCA: "+(ARCA.on?"PV "+ARCA.pv:"apagado")+(n?` · ${n} sin CAE`:""); b.style.background=n?(hs>=12?"var(--off)":"#e8a33d"):""; b.style.color=n?"#fff":""; }
+  try{ if(typeof arcaPend==="function" && !$("arcaModal").hidden) arcaPend(); }catch(e){}
+  try{ if(NUBE) NUBE.doc("sync/arca_"+($("caja").value||"caja").replace(/\s+/g,"")).set({caja:$("caja").value, maq:MAQ, pendientes:n, desde:viejo||null, horas:hs, error:n?(pend[0].arca.error||""):"", t:Date.now()}).catch(()=>{}); }catch(e){} }
+setInterval(arcaAuto, 120000); setTimeout(arcaAuto, 15000);
 async function arcaPedir(v,imprimir){
   try{ const r=await fetch(ARCA_URL+"/cae",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(arcaPayload(v))}); const j=await r.json();
     if(j.ok){ v.arca=j.r; guardar(); aviso(`${v.comp} ${String(j.r.pv).padStart(5,"0")}-${String(j.r.nro).padStart(8,"0")} · CAE ${j.r.cae}`); if(imprimir) imprimirTicket(v); return true; }
-    v.arca={pendiente:true, error:(j.r&&[...(j.r.errores||[]),...(j.r.obs||[])].join(" | "))||j.error||"rechazado"}; guardar(); aviso("ARCA no autorizó: "+v.arca.error);
-  }catch(e){ v.arca={pendiente:true, error:"sin conexión con el Servicio ARCA"}; guardar(); aviso("CAE pendiente: no responde el Servicio ARCA. Queda para reintentar."); }
+    v.arca={pendiente:true, desde:(v.arca&&v.arca.desde)||v.ts||Date.now(), error:(j.r&&[...(j.r.errores||[]),...(j.r.obs||[])].join(" | "))||j.error||"rechazado"}; guardar(); if(!arcaSilencio) aviso("ARCA no autorizó: "+v.arca.error);
+  }catch(e){ v.arca={pendiente:true, desde:(v.arca&&v.arca.desde)||v.ts||Date.now(), error:"sin conexión con el Servicio ARCA"}; guardar(); if(!arcaSilencio) aviso("CAE pendiente: no responde el Servicio ARCA. Queda para reintentar."); }
   if(imprimir) imprimirTicket(v); return false; }
 function arcaProcesar(v){
   if(ARCA.on && (v.comp==="Factura A"||v.comp==="Factura B")){ arcaPedir(v, $("chkImp").checked); return; }
