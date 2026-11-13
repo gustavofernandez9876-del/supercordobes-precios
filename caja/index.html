@@ -801,7 +801,7 @@ fetch("productos.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(ro
   PRODUCTOS = rows.map(([cod,bc,desc,rubro,marca,precio,fl,empresa,iva])=>({cod,bc,plu:"",desc,rubro,marca,empresa:empresa||"",precio,iva:(iva===""||iva==null)?null:+iva,efe:!fl.includes("n"),fv:fl.includes("f"),cig:/CIGARR|TABACO/i.test(rubro||"")})).map(p=>{ if(p.cig) p.efe=false; return p; });
   catalogoReal=true; aplicarEditsProd(); indexar();
   carrito=[]; ultimo=null;
-  render(); $("catInfo").textContent="Catálogo real: "+PRODUCTOS.length.toLocaleString("es-AR")+" productos (precios actualizados al 04/11/2026)";
+  render(); $("catInfo").textContent="Catálogo real: "+PRODUCTOS.length.toLocaleString("es-AR")+" productos (precios actualizados al 13/11/2026)";
 }).catch(()=>{ $("catInfo").textContent="Sin catálogo real: usando productos de ejemplo"; });
 // ===== Etiquetas de la balanza Cuora Neo =====
 // EAN-13: [prefijo fijo] + [código del producto] + [precio o peso] + dígito verificador.
@@ -1612,7 +1612,8 @@ fetch("clientes.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(row
   const propios=CLIENTES_RI.filter(c=>c.nuevo);
   CLIENTES_RI=rows.map(([cod,razon,cuit,cond,dom,doc,tel])=>({cod,razon,cuit,cond,dom,doc,tel:tel||""})).concat(propios);
   aplicarEditsCli();
-}).catch(()=>{});
+  try{ buscarFA(); }catch(e){}
+}).catch(()=>{ setTimeout(()=>location.reload(),30000); });
 const idCli=c=>c.cuit?("CUIT "+fmtCuit(c.cuit)):c.doc?("DNI "+c.doc):"sin documento";
 function pintarFA(esA, bGrande){
   faModoA=esA;
