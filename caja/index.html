@@ -1055,7 +1055,7 @@ function imprimirBoletasCC(c){
   <div class="c t">SUPERCORDOBES</div><div class="c">Cuenta corriente</div><hr><div><b>${esc(c.nombre)}</b></div><div class="s">Impreso ${hoy()} ${hora().slice(0,5)}</div><hr>
   ${bs.map(b=>`<div class="r"><span>${b.tipo==="FA"?"Factura A":b.tipo==="FB"?"Factura B":"Caja"} ${esc(b.nro)}</span><span>${fmt(b.deuda)}</span></div><div class="s">${new Date(b.fecha+"T12:00").toLocaleDateString("es-AR")}${b.deuda<b.total?" · total "+fmt(b.total)+" · pagado "+fmt(b.total-b.deuda):""}</div>`).join("")}
   ${bs.length?"":`<div class="s">Movimientos:</div>`+(c.movs||[]).slice(-15).map(m=>`<div class="r s"><span>${new Date(m.fecha+"T12:00").toLocaleDateString("es-AR")} ${esc(m.tipo)}</span><span>${m.monto<0?"-":""}${fmt(Math.abs(m.monto))}</span></div>`).join("")+(c.desde?`<div class="s">Debe desde ${new Date(c.desde+"T12:00").toLocaleDateString("es-AR")}</div>`:"")}
-  <hr><div class="r t"><span>SALDO</span><span>${fmt(c.saldo)}</span></div><div class="s">${bs.length} boletas adeudadas</div><br></body></html>`;
+  <hr><div class="r t"><span>SALDO</span><span>${fmt(c.saldo)}</span></div><div class="s">${bs.length} boletas adeudadas</div><br><script>try{if("serviceWorker" in navigator&&/github\.io$/.test(location.hostname))navigator.serviceWorker.register("sw.js");}catch(e){}</script></body></html>`;
   let f=document.getElementById("printFrame"); if(f) f.remove();
   f=document.createElement("iframe"); f.id="printFrame"; f.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0";
   document.body.appendChild(f); f.contentDocument.open(); f.contentDocument.write(h); f.contentDocument.close();
