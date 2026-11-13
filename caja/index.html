@@ -195,7 +195,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
   <div class="brand">Supercordobés <small>Sistema</small></div>
   <div class="shift">
     <label for="caja">Caja</label>
-    <select id="caja"><option>Caja 1</option><option>Caja 2</option></select>
+    <select id="caja"><option>Caja 1</option><option>Caja 2</option></select><script>try{var _c=localStorage.getItem("cajaNombre");if(_c)document.getElementById("caja").value=_c;}catch(e){}</script>
     <label for="cajero">Responsable</label>
     <input id="cajero" type="text" value="" size="10" readonly title="Se completa al ingresar con tu clave" style="cursor:pointer"><button class="btn" id="btnLogin" type="button">Cambiar cajero</button>
     <label for="turno">Turno</label>
@@ -4575,6 +4575,7 @@ arcaGuardar();
 $("btnArca").addEventListener("click",()=>{ $("arcaOn").checked=ARCA.on; $("arcaPV").value=ARCA.pv; arcaPend(); $("arcaModal").hidden=false; });
 $("arcaCerrar").addEventListener("click",()=>{ $("arcaModal").hidden=true; $("scan").focus(); });
 $("arcaOn").addEventListener("change",()=>{ ARCA.on=$("arcaOn").checked; arcaGuardar(); });
+$("caja").addEventListener("change",()=>{ try{localStorage.setItem("cajaNombre",$("caja").value);}catch(e){} if(ARCA.on){ ARCA.pv = $("caja").value==="Caja 2" ? "12" : "8"; arcaGuardar(); } });
 $("arcaPV").addEventListener("change",()=>{ ARCA.pv=$("arcaPV").value; arcaGuardar(); });
 $("arcaProbar").addEventListener("click",async()=>{ $("arcaEst").textContent="Probando…";
   try{ const j=await (await fetch(ARCA_URL+"/ultimo?pv="+ARCA.pv+"&tipo=6")).json(); $("arcaEst").textContent = j.ok ? `Conectado a ARCA ✓ · PV ${ARCA.pv} · última Factura B: ${j.nro}` : "ARCA respondió con error: "+(j.error||""); }
