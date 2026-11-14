@@ -797,7 +797,7 @@ function stockDe(p){ if(!p||STOCK.s[p.cod]==null) return null; let n=+STOCK.s[p.
   for(const v of todas){ for(const i of (v.items||[])){ if(i.cod===p.cod) n += v.nc&&v.devuelveStock ? Math.abs(+i.q||0) : (v.nc?0:-(+i.q||0)); } }
   return Math.round(n*100)/100; }
 function stockTxt(p){ const n=stockDe(p); return n==null?'<span style="color:var(--muted)">sin dato</span>':`<b style="color:${n<=0?'var(--off)':'var(--accent)'}">${n.toLocaleString('es-AR')}</b>`; }
-fetch("productos.json").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(rows=>{
+fetch("productos.json",{cache:"no-store"}).then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(rows=>{
   PRODUCTOS = rows.map(([cod,bc,desc,rubro,marca,precio,fl,empresa,iva])=>({cod,bc,plu:"",desc,rubro,marca,empresa:empresa||"",precio,iva:(iva===""||iva==null)?null:+iva,efe:!fl.includes("n"),fv:fl.includes("f"),cig:/CIGARR|TABACO/i.test(rubro||"")})).map(p=>{ if(p.cig) p.efe=false; return p; });
   catalogoReal=true; aplicarEditsProd(); indexar();
   carrito=[]; ultimo=null;
