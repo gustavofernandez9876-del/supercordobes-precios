@@ -1867,7 +1867,26 @@ async function subir(){ if(!NUBE||subiendo||!PEND.length) { pintarNube(); return
   try{ while(PEND.length){ const {tipo,obj}=PEND[0]; await NUBE.doc(`dias/${obj.dia}/${tipo}/${obj.id}`).set(JSON.parse(JSON.stringify(obj))); PEND.shift(); lsSet("cajaPend",PEND); } nubeOK=true; }
   catch(e){ nubeOK=false; } subiendo=false; pintarNube(); }
 setInterval(subir, 20000); window.addEventListener("online", subir);
-function pintarNube(){ const el=$("nubeEst"); if(!el) return; el.textContent = !NUBE ? "Nube: sin conexión (guarda en esta compu)" : PEND.length ? `Nube: ${PEND.length} pendiente${PEND.length>1?"s":""} de subir` : "Nube: sincronizado ✓"; el.style.color = !NUBE||PEND.length ? "var(--off)" : "var(--accent)"; }
+// Nube propia (Firebase de Gustavo): funciona en cualquier versión de la caja, también en GitHub.
+const FB_URL="https://supercordobes-322f9-default-rtdb.firebaseio.com", FB_K="sc_b7Kq29xLmZ";
+const dmy2iso=f=>{ const m=String(f||"").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m? m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0") : null; };
+let fbBusy=false;
+async function subirFB(){ if(fbBusy||!navigator.onLine) return; fbBusy=true;
+  try{
+    const lim=diaISO(Date.now()-3*864e5), porDia={};
+    const add=(tipo,arr)=>{ (arr||[]).forEach(o=>{ if(!o) return; const d=o.dia||dmy2iso(o.fecha)||(o.ts?diaISO(o.ts):null); if(!d||d<lim) return;
+      if(!o.id) o.id=slug(o.caja||$("caja").value)+"-"+MAQ+"-"+d+"-"+(o.nro!=null?o.nro:String(o.hora||"").replace(/\D/g,"")+"-"+Math.round(o.monto||o.total||0));
+      ((porDia[d]=porDia[d]||{})[tipo]=porDia[d][tipo]||{})[o.id.replace(/[.#$\[\]\/]/g,"_")]=JSON.parse(JSON.stringify(o)); }); };
+    add("ventas",ventas); add("cobros",cobros); try{ add("cierres",cierres); }catch(e){}
+    for(const d of Object.keys(porDia)) for(const t of Object.keys(porDia[d])){
+      const r=await fetch(`${FB_URL}/${FB_K}/dias/${d}/${t}.json`,{method:"PATCH",body:JSON.stringify(porDia[d][t])}); if(!r.ok) throw r.status; }
+    await fetch(`${FB_URL}/${FB_K}/cajas/${slug($("caja").value)||"caja"}.json`,{method:"PUT",body:JSON.stringify({caja:$("caja").value,maq:MAQ,t:Date.now(),arca:(typeof ARCA!=="undefined"?ARCA.pv:"")})});
+    window.__fbOK=Date.now();
+  }catch(e){ window.__fbOK=0; }
+  fbBusy=false; try{ pintarNube(); }catch(e){} }
+setTimeout(subirFB,3000); setInterval(subirFB,30000); window.addEventListener("online",subirFB);
+
+function pintarNube(){ const el=$("nubeEst"); if(!el) return; if(!NUBE){ const ok=window.__fbOK&&Date.now()-window.__fbOK<90000; el.textContent= ok?"Nube: sincronizado ✓":"Nube: sin conexión (guarda en esta compu)"; el.style.color= ok?"var(--accent)":"var(--off)"; return; } el.textContent = !NUBE ? "Nube: sin conexión (guarda en esta compu)" : PEND.length ? `Nube: ${PEND.length} pendiente${PEND.length>1?"s":""} de subir` : "Nube: sincronizado ✓"; el.style.color = !NUBE||PEND.length ? "var(--off)" : "var(--accent)"; }
 (function(){ const vp=ventas.push; ventas.push=function(...a){ const r=Array.prototype.push.apply(this,a); a.forEach(v=>aNube("ventas",v)); return r; };
   cobros.push=function(...a){ const r=Array.prototype.push.apply(this,a); a.forEach(c=>aNube("cobros",c)); return r; }; })();
 // Cuentas corrientes compartidas: la última modificación gana.
