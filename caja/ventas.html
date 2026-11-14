@@ -19,7 +19,10 @@ button{cursor:pointer}main{padding:12px 16px 40px;max-width:720px;margin:auto}
 </style></head><body>
 <header><h1>Ventas Supercordobés</h1>
 <div class="row"><button id="ant">◀</button><input type="date" id="dia"><button id="sig">▶</button>
-<select id="fc"><option value="">Todas las cajas</option></select></div>
+<select id="modo"><option value="d">Día</option><option value="s">Semana</option><option value="m">Mes</option></select>
+<select id="fc"><option value="">Todas las cajas</option></select>
+<select id="ft"><option value="">Todos los turnos</option></select>
+<select id="fv"><option value="">Todos los vendedores</option></select></div>
 <div class="est" id="est">Cargando…</div></header>
 <main id="m"></main>
 <script>
@@ -28,34 +31,52 @@ const $=id=>document.getElementById(id), fmt=n=>"$ "+Math.round(n).toLocaleStrin
 const iso=d=>{const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 $("dia").value=iso(new Date());
-$("ant").onclick=()=>{const d=new Date($("dia").value+"T12:00");d.setDate(d.getDate()-1);$("dia").value=iso(d);cargar()};
-$("sig").onclick=()=>{const d=new Date($("dia").value+"T12:00");d.setDate(d.getDate()+1);$("dia").value=iso(d);cargar()};
-$("dia").onchange=cargar;$("fc").onchange=pintar;
+const paso=()=>({d:1,s:7,m:0})[$("modo").value];
+const mover=k=>{const d=new Date($("dia").value+"T12:00");if($("modo").value==="m")d.setMonth(d.getMonth()+k);else d.setDate(d.getDate()+k*paso());$("dia").value=iso(d);cargar()};
+$("ant").onclick=()=>mover(-1);$("sig").onclick=()=>mover(1);
+function rango(){const d=new Date($("dia").value+"T12:00"),m=$("modo").value;let a,b;
+  if(m==="d"){a=b=new Date(d)}else if(m==="s"){a=new Date(d);a.setDate(d.getDate()-((d.getDay()+6)%7));b=new Date(a);b.setDate(a.getDate()+6)}
+  else{a=new Date(d.getFullYear(),d.getMonth(),1,12);b=new Date(d.getFullYear(),d.getMonth()+1,0,12)}
+  const out=[];for(let x=new Date(a);x<=b;x.setDate(x.getDate()+1))out.push(iso(x));return out}
+$("dia").onchange=cargar;$("modo").onchange=cargar;["fc","ft","fv"].forEach(i=>$(i).onchange=pintar);
 let DATA=null,CAJAS={};
 async function cargar(){ $("est").textContent="Cargando…";
-  try{ const [r,c]=await Promise.all([fetch(`${FB}/dias/${$("dia").value}.json`),fetch(`${FB}/cajas.json`)]);
-    DATA=await r.json()||{}; CAJAS=await c.json()||{}; pintar();
+  try{ const ds=rango(); const [rs,c]=await Promise.all([Promise.all(ds.map(d=>fetch(`${FB}/dias/${d}.json`).then(r=>r.json()).catch(()=>null))),fetch(`${FB}/cajas.json`)]);
+    DATA={ventas:{},cobros:{}}; rs.forEach((x,i)=>{ if(!x) return; for(const t of ["ventas","cobros"]) for(const [k,v] of Object.entries(x[t]||{})) DATA[t][k]=Object.assign({_d:ds[i]},v); });
+    DATA.rango=ds.length>1?`${ds[0].split("-").reverse().join("/")} al ${ds[ds.length-1].split("-").reverse().join("/")}`:"";
+    CAJAS=await c.json()||{}; pintar();
     $("est").textContent="Actualizado "+new Date().toLocaleTimeString("es-AR")+" · se actualiza solo cada 30 s"+estCajas();
   }catch(e){ $("est").textContent="Sin conexión. Reintenta en 30 s."; } }
 function estCajas(){ return Object.values(CAJAS).map(c=>{const m=Math.round((Date.now()-c.t)/60000);return ` · ${c.caja}: ${m<2?"en línea ✓":"hace "+m+" min"}`}).join(""); }
 function pintar(){ if(!DATA) return;
   const todas=Object.values(DATA.ventas||{}), cobros=Object.values(DATA.cobros||{});
   const cs=[...new Set(todas.map(v=>v.caja).concat(cobros.map(c=>c.caja)))].filter(Boolean).sort();
-  const sel=$("fc").value; $("fc").innerHTML='<option value="">Todas las cajas</option>'+cs.map(c=>`<option ${c===sel?"selected":""}>${esc(c)}</option>`).join("");
-  const vs=todas.filter(v=>!v.baja&&(!sel||v.caja===sel)).sort((a,b)=>(b.ts||0)-(a.ts||0));
-  const cb=cobros.filter(c=>!sel||c.caja===sel);
+  const opt=(id,tit,arr)=>{const sv=$(id).value;$(id).innerHTML=`<option value="">${tit}</option>`+[...new Set(arr)].filter(Boolean).sort().map(x=>`<option ${x===sv?"selected":""}>${esc(x)}</option>`).join("");return $(id).value};
+  const sel=opt("fc","Todas las cajas",cs), st=opt("ft","Todos los turnos",todas.map(v=>v.turno)), sv=opt("fv","Todos los vendedores",todas.map(v=>v.cajero));
+  const ok=v=>(!sel||v.caja===sel)&&(!st||v.turno===st)&&(!sv||v.cajero===sv);
+  const vs=todas.filter(v=>!v.baja&&ok(v)).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const cb=cobros.filter(c=>(!sel||c.caja===sel)&&(!st||c.turno===st)&&(!sv||c.cajero===sv));
+  const hh=v=>{let h=v.ts?new Date(v.ts).getHours():(()=>{const m=String(v.hora||"").match(/(\d+):/);if(!m)return null;let x=+m[1];if(/p\.?\s?m/i.test(v.hora)&&x<12)x+=12;if(/a\.?\s?m/i.test(v.hora)&&x===12)x=0;return x})();return h==null?"?":String(h).padStart(2,"0")+" h"};
+  const hor={},tur={},dia={};
   let tot=0;const med={},comp={},caj={},cjr={};
   vs.forEach(v=>{const sg=v.nc?-1:1,t=sg*(+v.total||0);tot+=t;
     (v.pagos&&v.pagos.length?v.pagos:[{medio:v.pago,monto:v.total}]).forEach(p=>med[p.medio||"?"]=(med[p.medio||"?"]||0)+sg*(+p.monto||0));
     const k=v.nc?"Nota de crédito":(v.comp||"?");(comp[k]=comp[k]||{n:0,t:0}).n++;comp[k].t+=t;
-    (caj[v.caja]=caj[v.caja]||{n:0,t:0}).n++;caj[v.caja].t+=t;(cjr[v.cajero||"?"]=cjr[v.cajero||"?"]||{n:0,t:0}).n++;cjr[v.cajero||"?"].t+=t;});
+    (caj[v.caja]=caj[v.caja]||{n:0,t:0}).n++;caj[v.caja].t+=t;(cjr[v.cajero||"?"]=cjr[v.cajero||"?"]||{n:0,t:0}).n++;cjr[v.cajero||"?"].t+=t;
+    const H=hh(v);(hor[H]=hor[H]||{n:0,t:0}).n++;hor[H].t+=t;const T=v.turno||"?";(tur[T]=tur[T]||{n:0,t:0}).n++;tur[T].t+=t;
+    const D=(v._d||"").split("-").reverse().join("/");(dia[D]=dia[D]||{n:0,t:0}).n++;dia[D].t+=t;});
+  const ord=(o)=>Object.fromEntries(Object.entries(o).sort((a,b)=>a[0].localeCompare(b[0])));
+  const lstO=(o,f)=>Object.entries(o).map(([k,x])=>`<div class="l"><span>${esc(k)} <span class="mut">(${x.n})</span></span><span class="num">${fmt(f(x))}</span></div>`).join("")||'<div class="mut">Sin datos</div>';
   const tc=cb.reduce((a,c)=>a+(+c.monto||0),0);
   const lst=(o,f)=>Object.entries(o).sort((a,b)=>Math.abs(f(b[1]))-Math.abs(f(a[1]))).map(([k,x])=>`<div class="l"><span>${esc(k)}${x.n!=null?` <span class="mut">(${x.n})</span>`:""}</span><span class="num">${fmt(f(x))}</span></div>`).join("")||'<div class="mut">Sin datos</div>';
-  $("m").innerHTML=`<div class="big">Total vendido${sel?" · "+esc(sel):""}<b>${fmt(tot)}</b>${vs.length} comprobantes${tc?` · cobros de cuenta corriente ${fmt(tc)}`:""}</div>
+  $("m").innerHTML=`<div class="big">Total vendido${DATA.rango?" · "+DATA.rango:""}${sel?" · "+esc(sel):""}${st?" · "+esc(st):""}${sv?" · "+esc(sv):""}<b>${fmt(tot)}</b>${vs.length} comprobantes${tc?` · cobros de cuenta corriente ${fmt(tc)}`:""}</div>
   <div class="card"><h2>Por caja</h2>${lst(caj,x=>x.t)}</div>
   <div class="card"><h2>Por forma de pago</h2>${lst(Object.fromEntries(Object.entries(med).map(([k,t])=>[k,{t}])),x=>x.t)}</div>
   <div class="card"><h2>Por comprobante</h2>${lst(comp,x=>x.t)}</div>
-  <div class="card"><h2>Por cajero</h2>${lst(cjr,x=>x.t)}</div>
+  <div class="card"><h2>Por vendedor</h2>${lst(cjr,x=>x.t)}</div>
+  <div class="card"><h2>Por turno</h2>${lst(tur,x=>x.t)}</div>
+  ${Object.keys(dia).length>1?`<div class="card"><h2>Por día</h2>${lstO(Object.fromEntries(Object.entries(dia).sort((a,b)=>a[0].split("/").reverse().join().localeCompare(b[0].split("/").reverse().join()))),x=>x.t)}</div>`:""}
+  <div class="card"><h2>Por hora</h2>${lstO(ord(hor),x=>x.t)}</div>
   ${cb.length?`<div class="card"><h2>Cobros de cuenta corriente</h2>${cb.map(c=>`<div class="l"><span>${esc(c.cliente)} <span class="mut">${esc(c.hora)} · ${esc(c.medio)} · ${esc(c.caja)}</span></span><span class="num">${fmt(c.monto)}</span></div>`).join("")}</div>`:""}
   <div class="card"><h2>Comprobantes</h2>${vs.map(v=>`<div class="v ${v.nc?"nc":""}"><div class="l" style="border:0;padding:0"><span><b>${esc(v.comp)}${v.nc?" (NC)":""}</b> #${esc(v.nro)}</span><span class="num">${fmt((v.nc?-1:1)*v.total)}</span></div>
    <small>${esc(v.hora)} · ${esc(v.caja)} · ${esc(v.cajero)} · ${esc(v.pago)}${v.cliente?" · "+esc(v.cliente):""}${v.arca&&v.arca.pendiente?" · <span class='nc'>sin CAE</span>":""}</small>
