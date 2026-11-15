@@ -1485,8 +1485,8 @@ let cierres=[]; try { cierres=JSON.parse(localStorage.getItem("cajaCierres")||"[
 let ciMovs=[];
 const abiertas = () => ventas.filter(v=>v.caja===$("caja").value && v.turno===$("turno").value && v.fecha===hoy() && !v.cierre);
 const cobrosAb = () => cobros.filter(c=>c.caja===$("caja").value && c.turno===$("turno").value && c.fecha===hoy() && !c.cierre);
-function sistemaCaja(){
-  const vs=abiertas(), cs=cobrosAb(), s={};
+function sistemaCaja(vs0,cs0){
+  const vs=vs0||abiertas(), cs=cs0||cobrosAb(), s={};
   const MS=["Efectivo",...MEDIOS_DECL,"Cuenta corriente"], nz=x=>String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
   const med=x=>{ const n=nz(x); return MS.find(m=>n===nz(m)||n.startsWith(nz(m))) || (n.startsWith("cta")||n.startsWith("cuenta")?"Cuenta corriente":n.startsWith("transf")?"Transferencia":n.startsWith("tarj")||n.startsWith("cred")?"Crédito":n.startsWith("deb")?"Débito":null); };
   MS.forEach(m=>s[m]=0); s["Sin identificar"]=0;
@@ -1604,6 +1604,16 @@ $("ciMovAdd").addEventListener("click", ()=>{ const m=Math.round(+$("ciMovMonto"
   ciMovs.push({tipo:$("ciMovTipo").value, concepto:k, monto:m}); $("ciMovConc").value=""; $("ciMovMonto").value=""; pintarMovs(); calcCierre(); });
 $("ciMovs").addEventListener("click", e=>{ const b=e.target.closest("[data-mov]"); if (b){ ciMovs.splice(+b.dataset.mov,1); pintarMovs(); calcCierre(); }});
 $("ciConfirmar").addEventListener("click", ()=>confirmarCierre());
+// Recalcula "según sistema" y diferencias de los cierres ya hechos (corrige cierres con medios en $0)
+function recalcCierres(){ let n=0;
+  cierres.forEach(c=>{ const vs=ventas.filter(v=>v.cierre===c.id), cs=cobros.filter(x=>x.cierre===c.id); if(!vs.length&&!cs.length) return;
+    const s=sistemaCaja(vs,cs), sal=(c.movimientos||[]).reduce((a,x)=>a+(+x.monto||0),0), sis={Efectivo:(+c.fondo||0)+s.Efectivo-sal}, dif={};
+    MEDIOS_DECL.forEach(m=>sis[m]=s[m]);
+    ["Efectivo",...MEDIOS_DECL].forEach(m=>{ const d=c.declarado?c.declarado[m]:null; dif[m]=d==null?null:Math.round((d-sis[m])*100)/100; });
+    if(JSON.stringify(sis)!==JSON.stringify(c.sistema)||JSON.stringify(dif)!==JSON.stringify(c.diferencia)){ c.sistema=sis; c.diferencia=dif; c.ventaCuentaCorriente=s["Cuenta corriente"]; c.sinIdentificar=s["Sin identificar"]; c.recalculado=hoy()+" "+hora(); n++; } });
+  if(n){ try{ localStorage.setItem("cajaCierres",JSON.stringify(cierres)); }catch(e){} }
+  return n; }
+try{ recalcCierres(); }catch(e){}
 $("ciHist").addEventListener("click", e=>{ const b=e.target.closest("[data-impc]"); if (b){ const c=cierres.find(x=>x.id===b.dataset.impc); if (c) imprimirCierre(c); }});
 
 // ---------- Cliente para factura A
