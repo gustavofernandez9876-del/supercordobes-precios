@@ -1487,7 +1487,12 @@ const abiertas = () => ventas.filter(v=>v.caja===$("caja").value && v.turno===$(
 const cobrosAb = () => cobros.filter(c=>c.caja===$("caja").value && c.turno===$("turno").value && c.fecha===hoy() && !c.cierre);
 function sistemaCaja(){
   const vs=abiertas(), cs=cobrosAb(), s={};
-  ["Efectivo",...MEDIOS_DECL,"Cuenta corriente"].forEach(m=>{ s[m]=vs.reduce((a,v)=>a+(v.pagos?v.pagos.filter(p=>p.medio===m).reduce((x,p)=>x+p.monto,0):(v.pago===m?v.total:0)),0)+cs.filter(c=>c.medio===m).reduce((a,c)=>a+c.monto,0); });
+  const MS=["Efectivo",...MEDIOS_DECL,"Cuenta corriente"], nz=x=>String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  const med=x=>{ const n=nz(x); return MS.find(m=>n===nz(m)||n.startsWith(nz(m))) || (n.startsWith("cta")||n.startsWith("cuenta")?"Cuenta corriente":n.startsWith("transf")?"Transferencia":n.startsWith("tarj")||n.startsWith("cred")?"Crédito":n.startsWith("deb")?"Débito":null); };
+  MS.forEach(m=>s[m]=0); s["Sin identificar"]=0;
+  vs.forEach(v=>{ if(v.baja||v.comp==="Consumo interno") return; const sg=v.nc?-1:1; const ps=(v.pagos&&v.pagos.length)?v.pagos:[{medio:v.pago,monto:v.total}];
+    ps.forEach(p=>{ const m=med(p.medio)||"Sin identificar"; s[m]+=sg*(+p.monto||0); }); });
+  cs.forEach(c=>{ const m=med(c.medio)||"Sin identificar"; s[m]+=(+c.monto||0); });
   return s;
 }
 function porComp(vs){ const m={"Factura B":0,"Factura A":0,"Remito interno":0}; let nc=0, ci=0; vs.forEach(v=>{ if(v.nc){ nc+=v.total; return; } if(v.comp==="Consumo interno"){ ci+=v.valorInterno||0; return; } m[v.comp]=(m[v.comp]||0)+v.total; }); return {m,nc,ci,total:Object.values(m).reduce((a,x)=>a+x,0)-nc}; }
@@ -1518,7 +1523,7 @@ function calcCierre(){
   const dec={Efectivo:cont}, dif={Efectivo:cont-espEf}, sis={Efectivo:espEf};
   MEDIOS_DECL.forEach(m=>{ $("ciSis"+m).textContent=fmt(s[m]); const v=$("ciDec"+m).value; const d=v===""?0:(+v)-s[m]; dec[m]=v===""?null:+v; dif[m]=v===""?null:d; sis[m]=s[m];
     if (v==="") { $("ciDif"+m).textContent="—"; $("ciDif"+m).className="dif"; } else pinta("ciDif"+m,d); });
-  $("ciSisCC").textContent=fmt(s["Cuenta corriente"]);
+  $("ciSisCC").textContent=fmt(s["Cuenta corriente"]); if(s["Sin identificar"]) $("ciSisCC").textContent+=" · sin medio identificado: "+fmt(s["Sin identificar"]);
   return {sis,dec,dif,fondo,salidas,contado:cont,cc:s["Cuenta corriente"]};
 }
 function confirmarCierre(){
