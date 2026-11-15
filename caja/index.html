@@ -214,7 +214,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <button class="btn" id="btnVencCel" type="button" onclick="location.hash='#venc';location.reload()">📱 App vencimientos</button>
     <button class="btn" id="btnArca" type="button">ARCA: apagado</button>
     <button class="btn" id="btnFondo" type="button">Ingreso de fondos</button>
-    <button class="btn" id="btnMigrar" type="button">Pasar ventas a la nube</button><input type="file" id="migFile" accept=".json,application/json" hidden>
+    <button class="btn" id="btnMigrar" type="button" hidden>Pasar ventas a la nube</button><input type="file" id="migFile" accept=".json,application/json" hidden>
     <button class="btn" id="btnCierre" type="button">Cerrar caja</button>
     <button class="btn" id="btnFull" type="button">Pantalla completa</button>
     <button class="btn primary" id="btnCliente" type="button">Pantalla cliente</button>
@@ -1927,8 +1927,7 @@ $("btnMigrar").addEventListener("click", ()=>{
     const data={v:1, caja, maq:MAQ, exportado:new Date().toISOString(), ventas, cobros, cierres, fondos:FONDOS, cc:CC, ccT, arca:ARCA};
     const blob=new Blob([JSON.stringify(data)],{type:"application/json"}); const a=document.createElement("a");
     a.href=URL.createObjectURL(blob); a.download=`${slug(caja)}_ventas_${diaISO(new Date())}.json`; document.body.appendChild(a); a.click(); a.remove();
-    ARCA.on=false; arcaGuardar();
-    aviso(`Archivo descargado (${ventas.length} ventas). Esta caja dejó de pedir CAE: ahora lo hace la caja en la nube. Abrí la caja en claude.ai, tocá "Pasar ventas a la nube" y elegí el archivo de la carpeta Descargas.`);
+    aviso(`Archivo descargado (${ventas.length} ventas). Esta caja sigue pidiendo CAE. Abrí la caja en claude.ai, tocá "Pasar ventas a la nube" y elegí el archivo de la carpeta Descargas.`);
     return; }
   $("migFile").value=""; $("migFile").click(); });
 $("migFile").addEventListener("change", async e=>{ const fl=e.target.files[0]; if(!fl) return; let d;
@@ -4610,7 +4609,12 @@ function arcaGuardar(){ lsSet("cajaArca",ARCA); $("btnArca").textContent="ARCA: 
 arcaGuardar();
 $("btnArca").addEventListener("click",()=>{ $("arcaOn").checked=ARCA.on; $("arcaPV").value=ARCA.pv; arcaPend(); $("arcaModal").hidden=false; });
 $("arcaCerrar").addEventListener("click",()=>{ $("arcaModal").hidden=true; $("scan").focus(); });
-$("arcaOn").addEventListener("change",()=>{ ARCA.on=$("arcaOn").checked; arcaGuardar(); });
+// Facturas de los últimos 2 días hechas con ARCA apagado: quedan en la lista para pedir CAE
+function arcaSinCae(){ if(!ARCA.on) return 0; const lim=new Date(); lim.setDate(lim.getDate()-1); const okF=f=>{ const m=String(f||"").split("/"); if(m.length<3) return false; return new Date(+m[2],+m[1]-1,+m[0])>=new Date(lim.getFullYear(),lim.getMonth(),lim.getDate()); };
+  let n=0; ventas.forEach(v=>{ if(v.arca||v.baja||v.nc||!/^Factura [AB]$/.test(v.comp||"")||v.caja!==$("caja").value||!okF(v.fecha)) return; v.arca={pendiente:true,desde:v.ts||Date.now(),error:"hecha con ARCA apagado"}; n++; });
+  if(n){ guardar(); try{arcaPend();}catch(e){} } return n; }
+$("arcaOn").addEventListener("change",()=>{ ARCA.on=$("arcaOn").checked; arcaGuardar(); if(ARCA.on){ const n=arcaSinCae(); if(n) aviso(n+" factura(s) de hoy/ayer sin CAE quedaron en la lista: se piden solas."); } });
+setTimeout(()=>{ try{ arcaSinCae(); }catch(e){} },4000);
 $("caja").addEventListener("change",()=>{ try{localStorage.setItem("cajaNombre",$("caja").value);}catch(e){} if(ARCA.on){ ARCA.pv = $("caja").value==="Caja 2" ? "12" : "8"; arcaGuardar(); } });
 $("arcaPV").addEventListener("change",()=>{ ARCA.pv=$("arcaPV").value; arcaGuardar(); });
 $("arcaProbar").addEventListener("click",async()=>{ $("arcaEst").textContent="Probando…";
