@@ -137,11 +137,22 @@ function unirCuenta(b, l, r){
   else { var imp = x.boletas.filter(function(y){ return (+y.deuda||0) > 0; }).map(function(y){ return y.fecha; }).sort(); if (imp.length) x.desde = imp[0]; else x.desde = x.desde || l.desde || r.desde || null; }
   return x;
 }
+// Forma canónica (claves y listas ordenadas) para comparar contenido sin importar el orden.
+function canon(o){
+  if (Array.isArray(o)) return o.map(canon).map(function(x){ return [JSON.stringify(x), x]; }).sort(function(a, b){ return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; }).map(function(p){ return p[1]; });
+  if (o && typeof o === "object"){ var s = {}; Object.keys(o).sort().forEach(function(k){ if (o[k] !== undefined) s[k] = canon(o[k]); }); return s; }
+  return o;
+}
+var igual = function(a, b){ return JSON.stringify(canon(a)) === JSON.stringify(canon(b)); };
+window.ccIgual = igual;
 // Une listas completas de cuentas. base puede ser null (se toma lo común como base).
+// Si el resultado es el mismo contenido que la nube, devuelve el objeto de la nube tal cual
+// (así las dos cajas quedan idénticas byte a byte y no se reescriben una a la otra).
 window.ccMerge3 = function(base, loc, rem){
   var B = new Map((base||[]).map(function(c){ return [c.id, c]; })), L = new Map((loc||[]).map(function(c){ return [c.id, c]; })), R = new Map((rem||[]).map(function(c){ return [c.id, c]; }));
-  var ids = []; (loc||[]).concat(rem||[]).forEach(function(c){ if (ids.indexOf(c.id) < 0) ids.push(c.id); });
-  return ids.map(function(id){
+  var ids = []; (rem||[]).concat(loc||[]).forEach(function(c){ if (ids.indexOf(c.id) < 0) ids.push(c.id); });
+  return ids.map(function(id){ var x = unirId(id); var r = R.get(id), l = L.get(id); if (r && igual(x, r)) return r; if (l && igual(x, l)) return l; return x; });
+  function unirId(id){
     var b = B.get(id), l = L.get(id), r = R.get(id);
     if (!b && l && r){ // sin base: lo común es la base
       var cm = {}; Object.keys(l).forEach(function(k){ if (clave(l[k]) === clave(r[k])) cm[k] = l[k]; });
@@ -151,6 +162,6 @@ window.ccMerge3 = function(base, loc, rem){
       b = cm;
     }
     return unirCuenta(b, l, r);
-  });
+  }
 };
 })();
