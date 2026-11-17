@@ -21,6 +21,24 @@
  ],
  "proveedores": [
   {
+   "proveedor": "Rumipal (sodería, presupuesto/remito)",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.41
+    }
+   ],
+   "comprobante": "presupuesto/remito",
+   "alias": [
+    "Rumipal",
+    "Sodería"
+   ],
+   "notas": "Aguas en bidón y sodas en botella. Dictado por Gustavo 17/11/2026: 1,41. Unidades sin cargo entran en el divisor. Ver si el precio es por pack."
+  },
+  {
    "proveedor": "Pirani Distribuciones",
    "base": "PU_NETO",
    "reglas": [
