@@ -713,6 +713,12 @@ function calcLinea(l){
     desc = share*p.precio*0.05; motivo = inPk>0 ? `5% pack cerrado ${pago} (${pr.txt})` : `pack de ${pr.n}: faltan ${pr.n-(Q%pr.n)}`;
   }
   else if (pago === "Efectivo" && p.cod==="250V" && l.fijo!=null){ desc = l.fijo*DESC_EFE; motivo="5% efectivo (varios balanza)"; }
+  else if (pago === "Efectivo" && +p.precioEfe > 0 && +p.precioEfe < p.precio){
+    // Precio fijo de contado efectivo (lo pone Gustavo por producto, ej. leche Cotapa 1.800 lista / 1.700 efectivo).
+    // Reemplaza al 5% y al 10% de pack para ese producto.
+    const libres = Math.max(0, q - ofertaUnid - cU);
+    desc = libres*(p.precio - p.precioEfe); motivo = `contado efectivo ${fmt(p.precioEfe)} c/u`;
+  }
   else if (pago === "Efectivo" && p.efe){
     const libres = Math.max(0, q - ofertaUnid - cU);
     if (p.fv){ desc = libres*p.precio*DESC_FV; motivo="20% efectivo FyV"; }

@@ -89,7 +89,7 @@ async function cargar(){
     const rows = await (await fetch("productos.json", {cache:"no-store"})).json();
     PROD = (await fb("prod")) || {};
     P = rows.map(r => ({cod:r[0], bc:r[1], desc:r[2], rubro:r[3], marca:r[4], precio:r[5], h:" "+norm(r[0]+" "+r[1]+" "+r[2]+" "+(r[4]||""))+" "}));
-    P.forEach(p => { const e = PROD[p.cod]; if (e && e.datos && e.datos.precio != null) { p.precio = e.datos.precio; p.cel = e; } });
+    P.forEach(p => { const e = PROD[p.cod]; if (e && e.datos){ if (e.datos.precio != null) p.precio = e.datos.precio; p.precioEfe = +e.datos.precioEfe || 0; p.cel = e; } });
     $("aviso").innerHTML = (PRUEBA ? '<b class="mal">MODO PRUEBA</b> · ' : "") + P.length.toLocaleString("es-AR") + " productos";
     ultimos();
   }catch(e){ $("aviso").textContent = "No se pudo cargar: " + e.message; }
@@ -108,6 +108,8 @@ function ficha(p){
   <p class="mut">Precio nuevo directo, o costo × coeficiente (redondeo a $50).</p>
   <p class="row"><input id="fPrecio" type="number" inputmode="numeric" placeholder="Precio nuevo"></p>
   <p class="row"><input id="fCosto" type="number" inputmode="decimal" placeholder="Costo"><input id="fCoef" type="number" inputmode="decimal" step="0.01" placeholder="Coef. ej 1.74"></p>
+  <p class="mut">Precio fijo de contado efectivo (opcional; reemplaza el 5 %). Vacío = 5 % normal.${p.precioEfe?` Hoy: <b>${fmt(p.precioEfe)}</b>`:""}</p>
+  <p><input id="fEfe" type="number" inputmode="numeric" placeholder="Precio contado efectivo" value="${p.precioEfe||""}"></p>
   <p><input id="fMotivo" placeholder="Motivo (opcional)"></p>
   <p class="row"><button class="pri" type="button" id="fGuardar">Guardar precio</button><button type="button" id="fCerrar">Cerrar</button></p>`;
   const calc = () => { const c = +$("fCosto").value, k = +String($("fCoef").value).replace(",", "."); if (c > 0 && k > 0) $("fPrecio").value = red50(c*k); };
@@ -116,18 +118,21 @@ function ficha(p){
   $("fGuardar").addEventListener("click", () => guardarPrecio(p));
 }
 async function guardarPrecio(p){
-  const nuevo = Math.round(+$("fPrecio").value);
+  const nuevo = Math.round(+$("fPrecio").value) || p.precio;
+  const efe = Math.round(+$("fEfe").value) || 0;
   if (!(nuevo > 0)){ toast("Poné el precio nuevo"); return; }
-  if (!confirm(`${p.desc}\n${fmt(p.precio)} → ${fmt(nuevo)}\n¿Confirmás? Las cajas lo toman en un minuto.`)) return;
+  if (efe && efe >= nuevo){ toast("El precio de efectivo tiene que ser menor que el de lista"); return; }
+  if (nuevo === p.precio && efe === (+p.precioEfe||0)){ toast("No hay cambios"); return; }
+  if (!confirm(`${p.desc}\nLista: ${fmt(p.precio)} → ${fmt(nuevo)}\nEfectivo: ${efe?fmt(efe):"5 % normal"}\n¿Confirmás? Las cajas lo toman en un minuto.`)) return;
   const ts = Date.now(), fecha = new Date().toLocaleString("es-AR"), motivo = $("fMotivo").value.trim();
   const ant = PROD[p.cod] || {};
-  const reg = {cod:p.cod, nuevo:!!ant.nuevo, datos:Object.assign({}, ant.datos||{}, {precio:nuevo}), hist:(ant.hist||[]).concat([{fecha, user:"Gustavo", campo:"Precio", antes:fmt(p.precio), despues:fmt(nuevo)+" (celular"+(motivo?": "+motivo:"")+")"}]).slice(-20), ts, caja:"Celular", maq:"celular"};
+  const reg = {cod:p.cod, nuevo:!!ant.nuevo, datos:Object.assign({}, ant.datos||{}, {precio:nuevo, precioEfe:efe}), hist:(ant.hist||[]).concat([{fecha, user:"Gustavo", campo:"Precio", antes:fmt(p.precio), despues:fmt(nuevo)+(efe?" · efectivo "+fmt(efe):"")+" (celular"+(motivo?": "+motivo:"")+")"}]).slice(-20), ts, caja:"Celular", maq:"celular"};
   try{
     await fb("prod/" + encodeURIComponent(p.cod), {method:"PUT", body:JSON.stringify(reg)});
     const id = "cel-" + ts;
     await fb("dias/"+hoy()+"/productos/"+id, {method:"PUT", body:JSON.stringify({id, cod:p.cod, ts, dia:hoy(), caja:"Celular", nuevo:false, datos:{precio:nuevo}, ultimo:reg.hist.at(-1)})});
-    await fb("cambiosCelular/"+id, {method:"PUT", body:JSON.stringify({id, cod:p.cod, desc:p.desc, antes:p.precio, precio:nuevo, motivo, ts, fecha, pasadoAGithub:false})});
-    PROD[p.cod] = reg; p.precio = nuevo; toast("Precio guardado. Las cajas lo toman en un minuto."); $("ficha").hidden = true; $("q").value = ""; ultimos();
+    await fb("cambiosCelular/"+id, {method:"PUT", body:JSON.stringify({id, cod:p.cod, desc:p.desc, antes:p.precio, precio:nuevo, precioEfe:efe, motivo, ts, fecha, pasadoAGithub:false})});
+    PROD[p.cod] = reg; p.precio = nuevo; p.precioEfe = efe; toast("Precio guardado. Las cajas lo toman en un minuto."); $("ficha").hidden = true; $("q").value = ""; ultimos();
   }catch(e){ toast("No se pudo guardar: " + e.message); }
 }
 async function ultimos(){

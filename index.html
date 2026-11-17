@@ -449,6 +449,12 @@ function mostrarProducto(p){
     $('f-etc').textContent = 'OTROS MEDIOS DE PAGO +10%';
     $('f-contado').innerHTML = '<span>$</span>' + comoPesos(Math.round(p.precio*1.10));
     $('f-bcont').className = 'bloque b-cont cig';
+  } else if(p.precioEfe > 0 && p.precioEfe < p.precio){
+    // Precio fijo de contado efectivo puesto por Gustavo (ej. leche Cotapa 1.800 / 1.700).
+    $('f-etl').textContent = 'PRECIO DE LISTA';
+    $('f-etc').textContent = 'CONTADO EFECTIVO';
+    $('f-contado').innerHTML = '<span>$</span>' + comoPesos(p.precioEfe);
+    $('f-bcont').className = 'bloque b-cont';
   } else {
     var pct = verd ? 0.20 : 0.05;
     $('f-etl').textContent = 'PRECIO DE LISTA';
@@ -721,7 +727,7 @@ function aplicarNube(prod){
     var e = prod[cod]; if(!e || !e.datos) continue;
     var precio = +e.datos.precio;
     var actual = porCod[e.cod || cod];
-    if(actual){ if(precio > 0) actual.precio = precio; continue; }
+    if(actual){ if(precio > 0) actual.precio = precio; actual.precioEfe = +e.datos.precioEfe || 0; continue; }
     // alta nueva con código de barras
     if(e.nuevo && e.datos.bc && precio > 0){
       var nuevo = { ean: String(e.datos.bc), nombre: e.datos.desc || 'Sin descripción', precio: precio, cod: e.cod || cod, rubro: e.datos.rubro || '' };
