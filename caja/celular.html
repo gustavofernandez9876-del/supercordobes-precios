@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Supercordobés · Celular</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1d2a22;--mut:#6b746e;--ac:#0f7a46;--off:#b3261e;--ln:#e4e0d6}
+@media (prefers-color-scheme:dark){:root{--bg:#121513;--card:#1c211e;--tx:#e8ece9;--mut:#9aa39d;--ac:#3fbf7f;--off:#ff7a70;--ln:#2c332f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:2;background:var(--bg);padding:12px 16px 8px;border-bottom:1px solid var(--ln)}
+h1{font-size:18px;margin:0 0 8px}main{padding:12px 16px 60px;max-width:640px;margin:auto}
+input,button,select,textarea{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--ln);background:var(--card);color:var(--tx);width:100%}
+button{cursor:pointer;width:auto}.pri{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.tabs{display:flex;gap:6px}.tabs button[aria-pressed=true]{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;margin:10px 0}
+.row{display:flex;gap:8px;align-items:center}.mut{color:var(--mut);font-size:13px}.ok{color:var(--ac)}.mal{color:var(--off)}
+.p{font-size:22px;font-weight:700}.it{padding:10px 0;border-bottom:1px solid var(--ln);cursor:pointer}.it:last-child{border:0}
+img.mini{width:72px;height:72px;object-fit:cover;border-radius:8px;margin:4px 4px 0 0}
+#toast{position:fixed;left:16px;right:16px;bottom:16px;background:var(--tx);color:var(--bg);padding:12px;border-radius:12px;text-align:center}
+</style>
+</head>
+<body>
+<header><h1>Supercordobés · Celular</h1>
+<div class="tabs" id="tabs" hidden><button type="button" data-t="precios" aria-pressed="true">Precios</button><button type="button" data-t="boletas" aria-pressed="false">Boletas pendientes</button></div>
+<div id="aviso" class="mut"></div></header>
+<main>
+<section id="login" class="card">
+  <p>Solo Gustavo. Escribí tu clave.</p>
+  <div class="row"><input id="pin" type="password" autocomplete="current-password" placeholder="Clave"><button class="pri" type="button" id="entrar">Entrar</button></div>
+</section>
+
+<section id="precios" hidden>
+  <input id="q" placeholder="Buscar: nombre, código o código de barras" autocomplete="off">
+  <div id="res" class="card" hidden></div>
+  <div id="ficha" class="card" hidden></div>
+  <div class="card"><b>Últimos cambios desde el celular</b><div id="ult" class="mut">—</div></div>
+</section>
+
+<section id="boletas" hidden>
+  <div class="card">
+    <b>Dejar una boleta para cargar</b>
+    <p class="mut">Sacale foto a todas las hojas. Queda guardada en la nube y se carga (precios, stock, altas) cuando se conecte la notebook.</p>
+    <p><input id="bProv" placeholder="Proveedor o persona que trae"></p>
+    <p><input id="bNro" placeholder="Número de boleta o remito"></p>
+    <p><textarea id="bNota" rows="3" placeholder="Coeficientes o indicaciones (ej.: galletitas 1,74, chocolates 1,92)"></textarea></p>
+    <p><input id="bFotos" type="file" accept="image/*" capture="environment" multiple></p>
+    <div id="bPrev"></div>
+    <p><button class="pri" type="button" id="bGuardar">Guardar boleta pendiente</button></p>
+  </div>
+  <div class="card"><b>Boletas guardadas</b><div id="bLista" class="mut">—</div></div>
+</section>
+</main>
+<div id="toast" hidden></div>
+<script>
+"use strict";
+const PRUEBA = /[?&]prueba\b/.test(location.search);
+const FB = "https://supercordobes-322f9-default-rtdb.firebaseio.com/" + (PRUEBA ? "prueba_sc" : "sc_b7Kq29xLmZ");
+const HASH_GUSTAVO = "2b913d70011050f7844bfabe88c26a86e05ca2c6ed1a1a3181e8e3084bd06070";
+const $ = id => document.getElementById(id);
+const fmt = n => "$ " + Math.round(+n||0).toLocaleString("es-AR");
+const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const norm = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+const normClave = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
+const hoy = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const red50 = x => Math.floor(x/50 + 0.5 + 1e-9) * 50;
+let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(tt); tt=setTimeout(()=>t.hidden=true,3000); }
+async function fb(path, opt){ const r = await fetch(FB + "/" + path + ".json", opt); if(!r.ok) throw new Error("La nube respondió " + r.status); return r.json(); }
+if (PRUEBA) $("aviso").innerHTML = '<b class="mal">MODO PRUEBA</b> (guarda en la nube de prueba)';
+
+// ---------- Clave ----------
+async function huella(s){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normClave(s))); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+async function entrar(){
+  const t = $("pin").value; $("pin").value = "";
+  const ok = (await huella(t)) === HASH_GUSTAVO || (PRUEBA && normClave(t) === "prueba1234");
+  if (!ok){ toast("Clave incorrecta"); try{ await fb("dias/"+hoy()+"/alertas/cel-"+Date.now(), {method:"PUT", body:JSON.stringify({accion:"Clave incorrecta en la página del celular", ts:Date.now()})}); }catch(e){} return; }
+  $("login").hidden = true; $("tabs").hidden = false; $("precios").hidden = false; cargar();
+}
+$("entrar").addEventListener("click", entrar);
+$("pin").addEventListener("keydown", e => { if (e.key === "Enter") entrar(); });
+$("tabs").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if(!b) return;
+  [...$("tabs").children].forEach(x => x.setAttribute("aria-pressed", x===b)); $("precios").hidden = b.dataset.t!=="precios"; $("boletas").hidden = b.dataset.t!=="boletas"; if(b.dataset.t==="boletas") listarBoletas(); });
+
+// ---------- Precios ----------
+let P = [], PROD = {};
+async function cargar(){
+  $("aviso").textContent = "Cargando productos…";
+  try{
+    const rows = await (await fetch("productos.json", {cache:"no-store"})).json();
+    PROD = (await fb("prod")) || {};
+    P = rows.map(r => ({cod:r[0], bc:r[1], desc:r[2], rubro:r[3], marca:r[4], precio:r[5], h:" "+norm(r[0]+" "+r[1]+" "+r[2]+" "+(r[4]||""))+" "}));
+    P.forEach(p => { const e = PROD[p.cod]; if (e && e.datos && e.datos.precio != null) { p.precio = e.datos.precio; p.cel = e; } });
+    $("aviso").innerHTML = (PRUEBA ? '<b class="mal">MODO PRUEBA</b> · ' : "") + P.length.toLocaleString("es-AR") + " productos";
+    ultimos();
+  }catch(e){ $("aviso").textContent = "No se pudo cargar: " + e.message; }
+}
+$("q").addEventListener("input", () => {
+  const t = norm($("q").value).split(" ").filter(Boolean); const box = $("res");
+  if (!t.length){ box.hidden = true; return; }
+  const hits = P.filter(p => t.every(w => p.h.includes(" "+w) || p.cod===w || p.bc===w)).slice(0, 30);
+  box.hidden = false;
+  box.innerHTML = hits.map(p => `<div class="it" data-cod="${esc(p.cod)}"><b>${esc(p.desc)}</b><br><span class="mut">cód. ${esc(p.cod)} · ${esc(p.bc||"sin código de barras")}</span> · <b>${fmt(p.precio)}</b></div>`).join("") || '<div class="mut">No encontré nada.</div>';
+});
+$("res").addEventListener("click", e => { const it = e.target.closest("[data-cod]"); if (it) ficha(P.find(p => p.cod === it.dataset.cod)); });
+function ficha(p){
+  const f = $("ficha"); f.hidden = false; $("res").hidden = true;
+  f.innerHTML = `<b>${esc(p.desc)}</b><div class="mut">cód. ${esc(p.cod)} · ${esc(p.rubro)}</div><div class="p">${fmt(p.precio)}</div>
+  <p class="mut">Precio nuevo directo, o costo × coeficiente (redondeo a $50).</p>
+  <p class="row"><input id="fPrecio" type="number" inputmode="numeric" placeholder="Precio nuevo"></p>
+  <p class="row"><input id="fCosto" type="number" inputmode="decimal" placeholder="Costo"><input id="fCoef" type="number" inputmode="decimal" step="0.01" placeholder="Coef. ej 1.74"></p>
+  <p><input id="fMotivo" placeholder="Motivo (opcional)"></p>
+  <p class="row"><button class="pri" type="button" id="fGuardar">Guardar precio</button><button type="button" id="fCerrar">Cerrar</button></p>`;
+  const calc = () => { const c = +$("fCosto").value, k = +String($("fCoef").value).replace(",", "."); if (c > 0 && k > 0) $("fPrecio").value = red50(c*k); };
+  $("fCosto").addEventListener("input", calc); $("fCoef").addEventListener("input", calc);
+  $("fCerrar").addEventListener("click", () => { f.hidden = true; });
+  $("fGuardar").addEventListener("click", () => guardarPrecio(p));
+}
+async function guardarPrecio(p){
+  const nuevo = Math.round(+$("fPrecio").value);
+  if (!(nuevo > 0)){ toast("Poné el precio nuevo"); return; }
+  if (!confirm(`${p.desc}\n${fmt(p.precio)} → ${fmt(nuevo)}\n¿Confirmás? Las cajas lo toman en un minuto.`)) return;
+  const ts = Date.now(), fecha = new Date().toLocaleString("es-AR"), motivo = $("fMotivo").value.trim();
+  const ant = PROD[p.cod] || {};
+  const reg = {cod:p.cod, nuevo:!!ant.nuevo, datos:Object.assign({}, ant.datos||{}, {precio:nuevo}), hist:(ant.hist||[]).concat([{fecha, user:"Gustavo", campo:"Precio", antes:fmt(p.precio), despues:fmt(nuevo)+" (celular"+(motivo?": "+motivo:"")+")"}]).slice(-20), ts, caja:"Celular", maq:"celular"};
+  try{
+    await fb("prod/" + encodeURIComponent(p.cod), {method:"PUT", body:JSON.stringify(reg)});
+    const id = "cel-" + ts;
+    await fb("dias/"+hoy()+"/productos/"+id, {method:"PUT", body:JSON.stringify({id, cod:p.cod, ts, dia:hoy(), caja:"Celular", nuevo:false, datos:{precio:nuevo}, ultimo:reg.hist.at(-1)})});
+    await fb("cambiosCelular/"+id, {method:"PUT", body:JSON.stringify({id, cod:p.cod, desc:p.desc, antes:p.precio, precio:nuevo, motivo, ts, fecha, pasadoAGithub:false})});
+    PROD[p.cod] = reg; p.precio = nuevo; toast("Precio guardado. Las cajas lo toman en un minuto."); $("ficha").hidden = true; $("q").value = ""; ultimos();
+  }catch(e){ toast("No se pudo guardar: " + e.message); }
+}
+async function ultimos(){
+  try{ const j = (await fb("cambiosCelular")) || {}; const l = Object.values(j).sort((a,b)=>b.ts-a.ts).slice(0,15);
+    $("ult").innerHTML = l.map(x => `<div class="it">${esc(x.fecha)} · <b>${esc(x.desc)}</b><br>${fmt(x.antes)} → <b>${fmt(x.precio)}</b>${x.motivo?" · "+esc(x.motivo):""} ${x.pasadoAGithub?'<span class="ok">✓ en el sistema</span>':'<span class="mut">(en la nube; se pasa al sistema cuando se conecte la notebook)</span>'}</div>`).join("") || "Ninguno.";
+  }catch(e){}
+}
+
+// ---------- Boletas pendientes ----------
+let FOTOS = [];
+function achicar(file){ return new Promise((ok, mal) => { const img = new Image(), u = URL.createObjectURL(file);
+  img.onload = () => { const m = 1600, k = Math.min(1, m/Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width*k); c.height = Math.round(img.height*k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", 0.72)); };
+  img.onerror = () => mal(new Error("No pude leer la foto")); img.src = u; }); }
+$("bFotos").addEventListener("change", async e => {
+  for (const f of e.target.files){ try{ FOTOS.push(await achicar(f)); }catch(err){ toast(err.message); } }
+  e.target.value = ""; $("bPrev").innerHTML = FOTOS.map(s => `<img class="mini" src="${s}" alt="foto">`).join("") + (FOTOS.length ? `<div class="mut">${FOTOS.length} foto(s)</div>` : "");
+});
+$("bGuardar").addEventListener("click", async () => {
+  const prov = $("bProv").value.trim(), nro = $("bNro").value.trim(), nota = $("bNota").value.trim();
+  if (!prov){ toast("Poné el proveedor o quién trae"); return; } if (!FOTOS.length){ toast("Sacale foto a la boleta"); return; }
+  const ts = Date.now(), id = "pend-" + ts;
+  try{
+    $("bGuardar").disabled = true; $("bGuardar").textContent = "Subiendo…";
+    await fb("pendientes/"+id, {method:"PUT", body:JSON.stringify({id, prov, nro, nota, fotos:FOTOS, ts, fecha:new Date().toLocaleString("es-AR"), estado:"pendiente", usuario:"Gustavo"})});
+    FOTOS = []; $("bPrev").innerHTML = ""; ["bProv","bNro","bNota"].forEach(i => $(i).value = "");
+    toast("Boleta guardada. Se carga cuando se conecte la notebook."); listarBoletas();
+  }catch(e){ toast("No se pudo guardar: " + e.message); }
+  finally{ $("bGuardar").disabled = false; $("bGuardar").textContent = "Guardar boleta pendiente"; }
+});
+async function listarBoletas(){
+  try{ const j = (await fb("pendientes", {})) || {}; const l = Object.values(j).sort((a,b)=>b.ts-a.ts).slice(0,30);
+    $("bLista").innerHTML = l.map(x => `<div class="it">${esc(x.fecha)} · <b>${esc(x.prov)}</b> ${esc(x.nro||"")}<br>${(x.fotos||[]).length} foto(s) · ${x.estado==="cargada"?'<span class="ok">✓ cargada '+esc(x.cargada||"")+'</span>':'<span class="mal">pendiente</span>'}${x.nota?"<br>"+esc(x.nota):""}</div>`).join("") || "Ninguna.";
+  }catch(e){ $("bLista").textContent = "No se pudo leer la nube."; }
+}
+</script>
+</body>
+</html>
