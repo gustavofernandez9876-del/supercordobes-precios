@@ -1,0 +1,1085 @@
+{
+ "version": "2026-11-17",
+ "redondeo": {
+  "multiplo": 50,
+  "regla": "al múltiplo de 50 más cercano; resto 25 y 75 suben"
+ },
+ "bases": {
+  "PU_NETO": "P. UNIT neto con bonificación/descuento del renglón aplicado",
+  "TOTAL_RENGLON": "total del renglón ÷ unidades (incluye bonificadas)",
+  "SUBTOTAL_UNID": "SUBTOTAL ÷ UNIDADES",
+  "FINAL_UNIT": "columna FINAL UNIT",
+  "PRECIO_REMITO": "precio unitario del remito/factura B (ya trae IVA)",
+  "SOLO_STOCK": "solo se suma stock, no se toca el precio"
+ },
+ "reglas_generales": [
+  "Coeficientes finales: no sumar ni descontar IVA ni percepciones salvo indicación de Gustavo.",
+  "Unidades bonificadas entran en el divisor; bonificación repartida por marca y gramaje.",
+  "'extra' es un monto fijo que se suma después del coeficiente.",
+  "'*' = resto de los productos del comprobante.",
+  "Si un producto no matchea ninguna regla, preguntar a Gustavo."
+ ],
+ "proveedores": [
+  {
+   "proveedor": "Pirani Distribuciones",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "whiskas",
+      "pedigree"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "pringles",
+      "alfajor",
+      "palito",
+      "chupetin",
+      "tableta",
+      "bocadito",
+      "chocolate",
+      "pastilla",
+      "oblea",
+      "papas",
+      "mani",
+      "gomita",
+      "barra",
+      "dos corazones"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "galleta",
+      "tostada",
+      "bizcocho"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "Avisar si la boleta es B.",
+   "comprobante": "A"
+  },
+  {
+   "proveedor": "Pirani Distribuciones",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "aceite natura"
+     ],
+     "coef": 1.3
+    },
+    {
+     "items": [
+      "tostada riera",
+      "arrocitas",
+      "fantoche"
+     ],
+     "coef": 1.41
+    },
+    {
+     "items": [
+      "whiskas",
+      "pedigree"
+     ],
+     "coef": 1.46
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.56
+    }
+   ],
+   "comprobante": "B/remito"
+  },
+  {
+   "proveedor": "Delinter Sur SAS",
+   "base": "TOTAL_RENGLON",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.56
+    }
+   ],
+   "notas": "Total del renglón (con IVA e imp. interno) × 1,56 ÷ botellas (bultos × 6).",
+   "alias": [
+    "Delinter"
+   ]
+  },
+  {
+   "proveedor": "Raúl Walter Gómez S.A.S. (Arcor)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "bombon",
+      "seleccion",
+      "kiosco en casa"
+     ],
+     "coef": 1.92,
+     "extra": 300
+    },
+    {
+     "items": [
+      "helado"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "opera",
+      "mellizas",
+      "amor",
+      "sonrisas",
+      "rumba",
+      "merengadas",
+      "cofler rellena",
+      "formis",
+      "mana rellena",
+      "rex",
+      "chocolinas",
+      "block"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "saladix",
+      "barra",
+      "chocolate",
+      "alfajor",
+      "oblea",
+      "jugo",
+      "turron",
+      "caramelo",
+      "mogul",
+      "chicle",
+      "confite",
+      "rocklets"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "criollitas",
+      "bagley",
+      "surtido",
+      "salsa",
+      "pure",
+      "mermelada",
+      "poroto",
+      "atun",
+      "jardinera",
+      "arveja",
+      "choclo",
+      "mac & cheese",
+      "bizcochuelo",
+      "porteñitas",
+      "traviata",
+      "cereal mix",
+      "postre",
+      "gelatina"
+     ],
+     "coef": 1.74
+    },
+    {
+     "items": [
+      "fideo"
+     ],
+     "coef": 1.55
+    },
+    {
+     "items": [
+      "ramen"
+     ],
+     "coef": 1.6
+    }
+   ],
+   "alias": [
+    "Arcor",
+    "RWG"
+   ]
+  },
+  {
+   "proveedor": "A&V López (Mondeléz)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "cerealitas",
+      "variedad",
+      "gelatina",
+      "cereal",
+      "granola",
+      "postre",
+      "green hills",
+      "chantilly",
+      "polvo de hornear"
+     ],
+     "coef": 1.74
+    },
+    {
+     "items": [
+      "club social",
+      "oreo",
+      "mini oreo",
+      "pepitos",
+      "lincoln",
+      "choco chips"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "alfajor",
+      "rhodesia",
+      "mantecol",
+      "tita",
+      "chocolate",
+      "milka",
+      "cadbury",
+      "shot",
+      "chicle",
+      "caramelo",
+      "tang",
+      "clight",
+      "flow",
+      "toddy",
+      "snack"
+     ],
+     "coef": 1.92
+    }
+   ],
+   "notas": "Clight/Tang: el display se divide por 20 sobres.",
+   "alias": [
+    "A&V",
+    "AyV Lopez"
+   ]
+  },
+  {
+   "proveedor": "Alisur S.A.S. (Nestlé/Purina)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "bombon"
+     ],
+     "coef": 1.92,
+     "extra": 300
+    },
+    {
+     "items": [
+      "kitkat",
+      "chocolate"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "gati",
+      "dogui"
+     ],
+     "coef": 1.86
+    },
+    {
+     "items": [
+      "chocolatada",
+      "perro",
+      "gato",
+      "cat chow",
+      "felix"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "nescafe",
+      "nesquik",
+      "nestum",
+      "leche",
+      "nido",
+      "cereal",
+      "cafe",
+      "caldo"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "BONIF % se descuenta del P. UNIT, después ÷ unidades si viene en BULTOS."
+  },
+  {
+   "proveedor": "Logística La Serenísima",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "leche entera",
+      "leche descremada"
+     ],
+     "coef": 1.55
+    },
+    {
+     "items": [
+      "ricota",
+      "fraccionado",
+      "cremon fraccionado"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "queso",
+      "mozzarella",
+      "brie",
+      "cremon horma"
+     ],
+     "coef": 1.86
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "Oferta transitoria se aplica antes. Quesos: P.U. ya es por kilo. Port Salut y Casancrem 1,74; untables y quesos en pote 1,74.",
+   "alias": [
+    "La Serenísima",
+    "Mastellone",
+    "Danone"
+   ]
+  },
+  {
+   "proveedor": "Gerardo Rubén Costabella S.R.L.",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "leche",
+      "manteca"
+     ],
+     "coef": 1.55
+    },
+    {
+     "items": [
+      "panceta",
+      "jamon crudo",
+      "bondiola",
+      "jamon cocido",
+      "tybo",
+      "helado",
+      "dambo",
+      "lomo"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "salsa vanoli"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "mortadela",
+      "queso trozado",
+      "cremoso",
+      "queso azul",
+      "feteado",
+      "salamin",
+      "aceituna",
+      "goya",
+      "pategras",
+      "reggianito"
+     ],
+     "coef": 1.86
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "Quesos: P.U. por kilo. Aceitunas en balde ÷ kilos.",
+   "alias": [
+    "Costabella"
+   ]
+  },
+  {
+   "proveedor": "Lácteos Express",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "milan gigante",
+      "panceta"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "feteado",
+      "roquefort",
+      "salame"
+     ],
+     "coef": 1.86
+    },
+    {
+     "items": [
+      "provoleta"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "alias": [
+    "Ilolay",
+    "Lario"
+   ]
+  },
+  {
+   "proveedor": "Don Martín S.R.L.",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "supremas",
+      "cuarto trasero",
+      "citric"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "queso",
+      "cuartirolo"
+     ],
+     "coef": 1.86
+    },
+    {
+     "items": [
+      "frutas",
+      "berries",
+      "arandanos",
+      "frutillas"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "Supremas: P.U. de la caja ÷ kilos (precio por kilo)."
+  },
+  {
+   "proveedor": "Don Higinio S.R.L.",
+   "base": "SUBTOTAL_UNID",
+   "reglas": [
+    {
+     "items": [
+      "harina",
+      "arroz"
+     ],
+     "coef": 1.25
+    },
+    {
+     "items": [
+      "fideo",
+      "yerba amanda",
+      "yerba playadito"
+     ],
+     "coef": 1.55
+    },
+    {
+     "items": [
+      "aceite"
+     ],
+     "coef": 1.6
+    },
+    {
+     "items": [
+      "limpiador",
+      "suavizante"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "aceitunas 2 kg"
+     ],
+     "coef": 1.86
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "La bonificación no viene aplicada en P. UNIT."
+  },
+  {
+   "proveedor": "Juan José Morán (JJM)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "bombon surtido",
+      "felicidades",
+      "lovers"
+     ],
+     "coef": 1.92,
+     "extra": 300
+    },
+    {
+     "items": [
+      "harina",
+      "azucar"
+     ],
+     "coef": 1.55
+    },
+    {
+     "items": [
+      "aceite"
+     ],
+     "coef": 1.6
+    },
+    {
+     "items": [
+      "rocio",
+      "pan dulce",
+      "galleta",
+      "grimaldi",
+      "mayonesa",
+      "salsa",
+      "ketchup",
+      "avena",
+      "coctel"
+     ],
+     "coef": 1.74
+    },
+    {
+     "items": [
+      "polvoritas"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.92
+    }
+   ]
+  },
+  {
+   "proveedor": "DIPA (Parodi S.R.L.)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "aceite natura",
+      "arroz knorr"
+     ],
+     "coef": 1.55
+    },
+    {
+     "items": [
+      "jabon",
+      "dove",
+      "colgate",
+      "rexona",
+      "desodorante",
+      "alcohol",
+      "algodon"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "Vinos Cordero con Piel de Lobo: TOTAL FINAL ÷ botellas × 1,46."
+  },
+  {
+   "proveedor": "Magnum S.A.",
+   "base": "TOTAL_RENGLON",
+   "reglas": [
+    {
+     "items": [
+      "raid mmm 360"
+     ],
+     "coef": 1.74
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.92
+    }
+   ]
+  },
+  {
+   "proveedor": "A.J. & J.A. Redolfi",
+   "base": "TOTAL_RENGLON",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.92
+    }
+   ],
+   "alias": [
+    "Redolfi"
+   ]
+  },
+  {
+   "proveedor": "Cugiani & Cía. S.A.",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.92
+    }
+   ]
+  },
+  {
+   "proveedor": "ESEKA-U (RAFCA S.R.L.)",
+   "base": "TOTAL_RENGLON",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.92
+    }
+   ]
+  },
+  {
+   "proveedor": "La Virginia",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "aji",
+      "saborizador",
+      "pimienta",
+      "pimenton",
+      "vainilla",
+      "condimento"
+     ],
+     "coef": 1.81
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ]
+  },
+  {
+   "proveedor": "Distribuidora Jovita",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "vino"
+     ],
+     "coef": 1.74
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.86
+    }
+   ],
+   "comprobante": "A"
+  },
+  {
+   "proveedor": "Distribuidora Jovita",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "vino"
+     ],
+     "coef": 1.41
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.51
+    }
+   ],
+   "comprobante": "remito"
+  },
+  {
+   "proveedor": "Coca-Cola",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.51
+    }
+   ],
+   "notas": "Lista: sobre Costo Final."
+  },
+  {
+   "proveedor": "Dico Distribuidora",
+   "base": "SOLO_STOCK",
+   "reglas": []
+  },
+  {
+   "proveedor": "Barale Mayorista (cigarrillos)",
+   "base": "SOLO_STOCK",
+   "reglas": []
+  },
+  {
+   "proveedor": "Grupo Almag",
+   "base": "FINAL_UNIT",
+   "reglas": [
+    {
+     "items": [
+      "mani king",
+      "lustramuebles",
+      "suiza"
+     ],
+     "coef": 1.56
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.41
+    }
+   ]
+  },
+  {
+   "proveedor": "Romagnoli Distribuciones (Sancor)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "comprobante": "A"
+  },
+  {
+   "proveedor": "Romagnoli Distribuciones (Sancor)",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "leche sachet"
+     ],
+     "coef": 1.25
+    },
+    {
+     "items": [
+      "manteca 500"
+     ],
+     "coef": 1.41
+    }
+   ],
+   "comprobante": "remito"
+  },
+  {
+   "proveedor": "Dist. Saffadi (Tregar)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "leche"
+     ],
+     "coef": 1.25
+    },
+    {
+     "items": [
+      "queso azul"
+     ],
+     "coef": 1.46
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.41
+    }
+   ]
+  },
+  {
+   "proveedor": "Lácteos San Basilio (Orcovi)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "tybo"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "cuartirolo",
+      "romano"
+     ],
+     "coef": 1.86
+    },
+    {
+     "items": [
+      "crema"
+     ],
+     "coef": 1.74
+    }
+   ],
+   "notas": "Dulce repostero cuñete 5 kg: neto + 21% y después × 1,15. Untable no se carga."
+  },
+  {
+   "proveedor": "Busso Conrado Javier",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "harina"
+     ],
+     "coef": 1.25
+    },
+    {
+     "items": [
+      "jugo baggio"
+     ],
+     "coef": 1.51
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.41
+    }
+   ],
+   "comprobante": "B"
+  },
+  {
+   "proveedor": "Distribuidora GS / AGS",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.56
+    }
+   ],
+   "notas": "Precio menos 10% y después × 1,56. Con factura A: 1,92 sobre neto.",
+   "comprobante": "remito X"
+  },
+  {
+   "proveedor": "Don Yeyo",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.41
+    }
+   ]
+  },
+  {
+   "proveedor": "Don Chelo",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "el bierzo",
+      "salame milan"
+     ],
+     "coef": 1.56
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.41
+    }
+   ]
+  },
+  {
+   "proveedor": "Silvia Suárez (Super Silvia)",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.41
+    }
+   ]
+  },
+  {
+   "proveedor": "L y L",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.51
+    }
+   ]
+  },
+  {
+   "proveedor": "El Rey",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "garrapiñada",
+      "mani con chocolate"
+     ],
+     "coef": 1.51
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.56
+    }
+   ],
+   "comprobante": "B"
+  },
+  {
+   "proveedor": "Medicamentos venta libre",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.56
+    }
+   ],
+   "notas": "Se vende por unidad: tira/caja ÷ unidades.",
+   "comprobante": "B"
+  },
+  {
+   "proveedor": "Jumalá (O.D.I.S.A.)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.61
+    }
+   ],
+   "comprobante": "A"
+  },
+  {
+   "proveedor": "La Surieta S.A.S.",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "gouda"
+     ],
+     "coef": 1.46
+    }
+   ]
+  },
+  {
+   "proveedor": "Rosental",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "alfajor"
+     ],
+     "coef": 1.92
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.74
+    }
+   ]
+  },
+  {
+   "proveedor": "Sudoeste Bebidas (PepsiCo/Lay's)",
+   "base": "PRECIO_REMITO",
+   "reglas": [
+    {
+     "items": [
+      "vino dada"
+     ],
+     "coef": 1.41
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.56
+    }
+   ]
+  },
+  {
+   "proveedor": "Grupo PREB (Doninas/Rico Gusto)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "galletita"
+     ],
+     "coef": 1.74
+    },
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.92
+    }
+   ]
+  },
+  {
+   "proveedor": "HVJ Distribuciones (La Palmera/Manaos)",
+   "base": "PU_NETO",
+   "reglas": [
+    {
+     "items": [
+      "*"
+     ],
+     "coef": 1.86
+    }
+   ]
+  }
+ ]
+}
