@@ -578,7 +578,8 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
   <div class="panel" style="margin-top:12px"><div class="label">Cargados hoy</div><div id="vaHoy" class="hist num" style="max-height:none"></div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
-
+<!-- Nube compartida entre cajas (Firebase): cuentas corrientes, pagos a proveedores, faltantes, etc. (17/11/2026) -->
+<script src="nube.js"></script>
 <script>
 // Productos de EJEMPLO: se usan solo hasta que termina de cargar el catálogo real (productos.json).
 // fv = frutas y verduras (por kilo, 20% en efectivo) · pack = unidades del pack cerrado (10% en efectivo, reemplaza al 5%)
@@ -1386,7 +1387,11 @@ setTimeout(()=>{ let n=null; try{ n=sessionStorage.getItem("cajaCajero"); }catch
   $("lgEntrar").addEventListener("click", entrarCajero);
   ["lgPin","lgPin2"].forEach(id=>$(id).addEventListener("keydown", e=>{ if(e.key==="Enter") entrarCajero(); }));
 }, 0);
-window.claude?.use?.("db").then(d=>{ if(!d) return; d.doc("sync/cajeros").onSnapshot(x=>{ const j=x&&x.exists?x.data():null; if(j&&j.json){ try{ CLAVES=JSON.parse(j.json); localStorage.setItem("cajaClaves",j.json); if(!$("loginModal").hidden) pintarLogin(); }catch(e){} } },()=>{}); }).catch(()=>{});
+// Claves de cajeros compartidas: se juntan las de las dos cajas (si un cajero tiene clave en una sola, pasa a la otra).
+window.claude?.use?.("db").then(d=>{ if(!d) return; d.doc("sync/cajeros").onSnapshot(x=>{ const j=x&&x.exists?x.data():null; let rem={}; if(j&&j.json){ try{ rem=JSON.parse(j.json); }catch(e){} }
+  const unidas=Object.assign({}, CLAVES, rem); const faltan=Object.keys(CLAVES).some(k=>!(k in rem));
+  CLAVES=unidas; try{ localStorage.setItem("cajaClaves",JSON.stringify(CLAVES)); }catch(e){} if(!$("loginModal").hidden) pintarLogin();
+  if(faltan) d.doc("sync/cajeros").set({json:JSON.stringify(CLAVES), t:Date.now()}).catch(()=>{}); },()=>{}); }).catch(()=>{});
 function confiable(){ try { return localStorage.getItem(DISP_KEY) === AUTORIZADOS[0].hash.slice(0,16); } catch(e){ return false; } }
 function pintarDisp(){ const ok=confiable(); $("btnDisp").textContent = ok ? "Dispositivo de Gustavo ✓" : "Dispositivo: pide clave"; $("dispNo").hidden=ok; $("dispSi").hidden=!ok; }
 // Cada intento con clave equivocada queda registrado (quién estaba en la caja, qué quiso hacer y cuándo).
@@ -1913,15 +1918,49 @@ setTimeout(subirFB,3000); setInterval(subirFB,30000); window.addEventListener("o
 function pintarNube(){ const el=$("nubeEst"); if(!el) return; if(!NUBE){ const ok=window.__fbOK&&Date.now()-window.__fbOK<90000; el.textContent= ok?"Nube: sincronizado ✓":"Nube: sin conexión (guarda en esta compu)"; el.style.color= ok?"var(--accent)":"var(--off)"; return; } el.textContent = !NUBE ? "Nube: sin conexión (guarda en esta compu)" : PEND.length ? `Nube: ${PEND.length} pendiente${PEND.length>1?"s":""} de subir` : "Nube: sincronizado ✓"; el.style.color = !NUBE||PEND.length ? "var(--off)" : "var(--accent)"; }
 (function(){ const vp=ventas.push; ventas.push=function(...a){ const r=Array.prototype.push.apply(this,a); a.forEach(v=>aNube("ventas",v)); return r; };
   cobros.push=function(...a){ const r=Array.prototype.push.apply(this,a); a.forEach(c=>aNube("cobros",c)); return r; }; })();
-// Cuentas corrientes compartidas: la última modificación gana.
-let ccT=+lsGet("cajaCCt",0);
-window.__syncCC=function(){ ccT=Date.now(); lsSet("cajaCCt",ccT); if(NUBE) NUBE.doc("sync/cc").set({json:JSON.stringify(CC), t:ccT, maq:MAQ}).catch(()=>{}); };
-window.claude?.use?.("db").then(d=>{ if(!d) { pintarNube(); return; } NUBE=d; subir();
-  try{ NUBE.doc("sync/venc").onSnapshot(x=>{ const j=x&&x.exists?x.data():null; if(j&&j.json){ VENC=JSON.parse(j.json); lsSet("cajaVenc",VENC); try{render();}catch(e){} } },()=>{}); }catch(e){}
+// Cuentas corrientes compartidas entre cajas (17/11/2026): unión de 3 vías (nube.js → ccMerge3).
+// ccBase = última versión de la nube que vio esta caja. Lo que cada caja agrega (compras, pagos,
+// descuentos, notas de crédito) se suma al de la otra: nunca se pisan, aunque una esté sin internet.
+let ccT=+lsGet("cajaCCt",0), ccBase=lsGet("cajaCCbase",null), ccSubiendo=false, ccOtraVez=false, ccTimer=null;
+function ccGuardarLocal(lista){ CC.length=0; lista.forEach(c=>CC.push(c)); try{ localStorage.setItem("cajaCC",JSON.stringify(CC)); }catch(e){} }
+// Lee la nube, junta y graba SOLO si nadie la cambió en el medio (ETag); si cambió, vuelve a juntar.
+async function ccSubir(){
+  if(!NUBE||!window.ccMerge3||!window.NUBE_FB) return; if(ccSubiendo){ ccOtraVez=true; return; } ccSubiendo=true;
+  const U=window.NUBE_FB.url("sync/cc");
+  try{
+    for(let intento=0; intento<6; intento++){
+      const r=await fetch(U,{headers:{"X-Firebase-ETag":"true"},cache:"no-store"}); if(!r.ok) throw 0;
+      const etag=r.headers.get("ETag"); const x=await r.json(); const rem=x&&x.json?JSON.parse(x.json):null;
+      const unida = rem ? (ccBase ? window.ccMerge3(ccBase, CC, rem) : rem) : CC.slice();
+      if(JSON.stringify(unida)!==JSON.stringify(CC)){ ccGuardarLocal(unida); try{render();}catch(e){} try{ if(!$("ctaModal").hidden) renderCtas(); }catch(e){} }
+      if(rem && JSON.stringify(unida)===JSON.stringify(rem)){ ccBase=rem; lsSet("cajaCCbase",ccBase); break; }
+      ccT=Date.now(); lsSet("cajaCCt",ccT);
+      const p=await fetch(U,{method:"PUT",headers:{"if-match":etag},body:JSON.stringify({json:JSON.stringify(unida), t:ccT, maq:MAQ})});
+      if(p.status===412) continue;          // otra caja grabó en el medio: volver a juntar
+      if(!p.ok) throw 0;
+      ccBase=unida; lsSet("cajaCCbase",ccBase); break;
+    }
+  }catch(e){ setTimeout(()=>window.__syncCC(), 15000); }   // sin internet: reintenta solo
+  ccSubiendo=false; if(ccOtraVez){ ccOtraVez=false; setTimeout(ccSubir,300); }
+}
+window.__syncCC=function(){ ccT=Date.now(); lsSet("cajaCCt",ccT); clearTimeout(ccTimer); ccTimer=setTimeout(ccSubir,400); };
+window.claude?.use?.("db").then(async d=>{ if(!d) { pintarNube(); return; } NUBE=d; subir();
+  // Vencimientos: se juntan los de las dos cajas (por id); si esta caja tiene alguno que la nube no, lo sube.
+  try{ NUBE.doc("sync/venc").onSnapshot(x=>{ const j=x&&x.exists?x.data():null; let rem=[]; if(j&&j.json){ try{ rem=JSON.parse(j.json)||[]; }catch(e){} }
+    const m=new Map(rem.map(v=>[v.id,v])); let faltan=false; (VENC||[]).forEach(v=>{ if(v&&v.id&&!m.has(v.id)){ m.set(v.id,v); faltan=true; } });
+    VENC=[...m.values()]; lsSet("cajaVenc",VENC); try{render();}catch(e){}
+    if(faltan) NUBE.doc("sync/venc").set({json:JSON.stringify(VENC),t:Date.now()}).catch(()=>{}); },()=>{}); }catch(e){}
+  // Primera vez con la unión: la base es lo que esta caja ya tenía cuando se juntaron las dos cajas (ccbase/<máquina>).
+  if(!ccBase){ try{ const s=await NUBE.doc("ccbase/"+MAQ).get(); const x=s.exists?s.data():null; if(x&&x.json){ ccBase=JSON.parse(x.json); lsSet("cajaCCbase",ccBase); } }catch(e){} }
   d.doc("sync/cc").onSnapshot(s=>{ const x=s.exists?s.data():null;
-    if(!x){ window.__syncCC(); return; }
-    if(x.t>ccT && x.maq!==MAQ){ try{ const nv=JSON.parse(x.json); CC.length=0; nv.forEach(c=>CC.push(c)); localStorage.setItem("cajaCC",JSON.stringify(CC)); ccT=x.t; lsSet("cajaCCt",ccT); render(); }catch(e){} }
-    else if(ccT>x.t) window.__syncCC(); });
+    if(!x){ ccSubir(); return; }
+    if(ccSubiendo){ ccOtraVez=true; return; }   // se está grabando: al terminar vuelve a leer la nube
+    let rem; try{ rem=JSON.parse(x.json); }catch(e){ return; }
+    const unida = ccBase ? window.ccMerge3(ccBase, CC, rem) : rem;   // sin base (caja nueva): adopta la nube
+    ccBase=rem; lsSet("cajaCCbase",ccBase);
+    if(JSON.stringify(unida)!==JSON.stringify(CC)){ ccGuardarLocal(unida); try{render();}catch(e){} try{ if(!$("ctaModal").hidden) renderCtas(); }catch(e){} }
+    if(JSON.stringify(unida)!==JSON.stringify(rem)) window.__syncCC();
+  });
   movSuscribir(diaISO(new Date()));
 }).catch(()=>pintarNube());
 
