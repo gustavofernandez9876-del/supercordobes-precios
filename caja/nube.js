@@ -87,6 +87,23 @@ function colRef(path){
     onSnapshot: function(cb){ return suscribir(path, function(v){ v = v || {}; cb({docs: Object.keys(v).map(function(id){ var x = v[id]; return {id: id, data: function(){ return x; }}; })}); }); }
   };
 }
+// ---------- Redibujar sin molestar al cajero ----------
+// Lo que llega de la nube (ventas de la otra caja, cuentas corrientes, precios) NO redibuja la venta
+// mientras alguien está escribiendo (ej. el importe de un 250 "varios"): espera a que termine.
+var pendienteRender = false;
+function escribiendo(){
+  var a = document.activeElement; if (!a) return false;
+  var t = (a.tagName || "").toUpperCase(); if (t !== "INPUT" && t !== "TEXTAREA" && t !== "SELECT") return false;
+  if (a.id === "scan" && !a.value) return false;     // el lector vacío no cuenta
+  return true;
+}
+window.renderNube = function(){
+  if (typeof render !== "function") return;
+  if (escribiendo()){ pendienteRender = true; return; }
+  pendienteRender = false; try{ render(); }catch(e){}
+};
+setInterval(function(){ if (pendienteRender && !escribiendo()) window.renderNube(); }, 1000);
+
 var FBDB = { doc: docRef, collection: colRef, firebase: true, url: url };
 window.NUBE_FB = FBDB;
 if (!window.claude){

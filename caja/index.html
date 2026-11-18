@@ -1932,7 +1932,7 @@ async function ccSubir(){
       const r=await fetch(U,{headers:{"X-Firebase-ETag":"true"},cache:"no-store"}); if(!r.ok) throw 0;
       const etag=r.headers.get("ETag"); const x=await r.json(); const rem=x&&x.json?JSON.parse(x.json):null;
       const unida = rem ? (ccBase ? window.ccMerge3(ccBase, CC, rem) : rem) : CC.slice();
-      if(JSON.stringify(unida)!==JSON.stringify(CC)){ ccGuardarLocal(unida); try{render();}catch(e){} try{ if(!$("ctaModal").hidden) renderCtas(); }catch(e){} }
+      if(JSON.stringify(unida)!==JSON.stringify(CC)){ ccGuardarLocal(unida); window.renderNube?window.renderNube():render(); try{ if(!$("ctaModal").hidden) renderCtas(); }catch(e){} }
       if(rem && JSON.stringify(unida)===JSON.stringify(rem)){ ccBase=rem; lsSet("cajaCCbase",ccBase); break; }
       ccT=Date.now(); lsSet("cajaCCt",ccT);
       const p=await fetch(U,{method:"PUT",headers:{"if-match":etag},body:JSON.stringify({json:JSON.stringify(unida), t:ccT, maq:MAQ})});
@@ -1948,7 +1948,7 @@ window.claude?.use?.("db").then(async d=>{ if(!d) { pintarNube(); return; } NUBE
   // Vencimientos: se juntan los de las dos cajas (por id); si esta caja tiene alguno que la nube no, lo sube.
   try{ NUBE.doc("sync/venc").onSnapshot(x=>{ const j=x&&x.exists?x.data():null; let rem=[]; if(j&&j.json){ try{ rem=JSON.parse(j.json)||[]; }catch(e){} }
     const m=new Map(rem.map(v=>[v.id,v])); let faltan=false; (VENC||[]).forEach(v=>{ if(v&&v.id&&!m.has(v.id)){ m.set(v.id,v); faltan=true; } });
-    VENC=[...m.values()]; lsSet("cajaVenc",VENC); try{render();}catch(e){}
+    VENC=[...m.values()]; lsSet("cajaVenc",VENC); window.renderNube?window.renderNube():render();
     if(faltan) NUBE.doc("sync/venc").set({json:JSON.stringify(VENC),t:Date.now()}).catch(()=>{}); },()=>{}); }catch(e){}
   // Primera vez con la unión: la base es lo que esta caja ya tenía cuando se juntaron las dos cajas (ccbase/<máquina>).
   if(!ccBase){ try{ const s=await NUBE.doc("ccbase/"+MAQ).get(); const x=s.exists?s.data():null; if(x&&x.json){ ccBase=JSON.parse(x.json); lsSet("cajaCCbase",ccBase); } }catch(e){} }
@@ -1958,7 +1958,7 @@ window.claude?.use?.("db").then(async d=>{ if(!d) { pintarNube(); return; } NUBE
     let rem; try{ rem=JSON.parse(x.json); }catch(e){ return; }
     const unida = ccBase ? window.ccMerge3(ccBase, CC, rem) : rem;   // sin base (caja nueva): adopta la nube
     ccBase=rem; lsSet("cajaCCbase",ccBase);
-    if(JSON.stringify(unida)!==JSON.stringify(CC)){ ccGuardarLocal(unida); try{render();}catch(e){} try{ if(!$("ctaModal").hidden) renderCtas(); }catch(e){} }
+    if(JSON.stringify(unida)!==JSON.stringify(CC)){ ccGuardarLocal(unida); window.renderNube?window.renderNube():render(); try{ if(!$("ctaModal").hidden) renderCtas(); }catch(e){} }
     if(JSON.stringify(unida)!==JSON.stringify(rem)) window.__syncCC();
   });
   movSuscribir(diaISO(new Date()));
@@ -2011,7 +2011,7 @@ function movSuscribirRango(per,dia){ if(!NUBE) return; movUnsub&&movUnsub(); mov
     movMulti.push(NUBE.collection(`dias/${dd}/cobros`).onSnapshot(s=>{ C[dd]=s.docs.map(x=>x.data()); movCobros=Object.values(C).flat(); pintarMov(); },()=>{})); });
   pintarMov(); }
 function movSuscribir(dia){ if(!NUBE) return; movMulti.forEach(f=>{try{f()}catch(e){}}); movMulti=[]; movDia=dia; movUnsub&&movUnsub(); movCobUnsub&&movCobUnsub();
-  movUnsub=NUBE.collection(`dias/${dia}/ventas`).onSnapshot(s=>{ ventasNube=s.docs.map(x=>x.data()); if(dia===diaISO(new Date())) window.__vn=ventasNube; if(dia===diaISO(new Date())) render(); pintarMov(); }, ()=>{});
+  movUnsub=NUBE.collection(`dias/${dia}/ventas`).onSnapshot(s=>{ ventasNube=s.docs.map(x=>x.data()); if(dia===diaISO(new Date())) window.__vn=ventasNube; if(dia===diaISO(new Date())) (window.renderNube?window.renderNube():render()); pintarMov(); }, ()=>{});
   movCobUnsub=NUBE.collection(`dias/${dia}/cobros`).onSnapshot(s=>{ movCobros=s.docs.map(x=>x.data()); pintarMov(); }, ()=>{});
   try{ window.__movAlU&&window.__movAlU(); const [y,m,d]=dia.split("-"); const dd=(+d)+"/"+(+m)+"/"+y; window.__movAlU=NUBE.collection("alertas").onSnapshot(s=>{ movAlertas=s.docs.map(x=>x.data()).filter(a=>a.dia===dd); pintarMov(); },()=>{}); }catch(e){} }
 function partes(v){ return v.pagos&&v.pagos.length ? v.pagos : [{medio:v.pago, monto:v.total}]; }

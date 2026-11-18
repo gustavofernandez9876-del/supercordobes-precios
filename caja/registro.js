@@ -146,7 +146,7 @@ async function bajarProductos(){
     Object.values(todo).forEach(x=>{ if(!x||!x.cod) return; const loc=prodEdits[x.cod];
       if(!loc || (x.ts||0) > (loc.ts||0)){ if(loc && firmaProd(loc)!==prodEnviado[x.cod]) return; // cambio local sin subir: gana el local (se sube en el próximo ciclo)
         const e={nuevo:!!x.nuevo, datos:x.datos||{}, hist:x.hist||[], ts:x.ts}; prodEdits[x.cod]=e; prodEnviado[x.cod]=firmaProd(e); cambio=true; } });
-    if(cambio){ lsW("cajaProdEdits",prodEdits); lsW("cajaFBProd",prodEnviado); try{ aplicarEditsProd(); indexar(); }catch(e){} try{ render(); }catch(e){} }
+    if(cambio){ lsW("cajaProdEdits",prodEdits); lsW("cajaFBProd",prodEnviado); try{ aplicarEditsProd(); indexar(); }catch(e){} if(window.renderNube) window.renderNube(); else try{ render(); }catch(e){} }
   }catch(e){}
 }
 REG.subirProductos=subirProductos; REG.bajarProductos=bajarProductos;
