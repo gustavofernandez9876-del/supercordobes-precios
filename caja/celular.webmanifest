@@ -1,0 +1,15 @@
+{
+  "name": "Supercordobés · Celular",
+  "short_name": "Supercordobés",
+  "description": "Precios, boletas y ventas del Supercordobés",
+  "start_url": "celular.html",
+  "scope": "celular.html",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#0f7a46",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "cel-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "cel-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

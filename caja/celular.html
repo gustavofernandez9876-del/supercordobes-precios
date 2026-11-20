@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Supercordobés · Celular</title>
+<link rel="manifest" href="celular.webmanifest">
+<meta name="theme-color" content="#0f7a46">
+<link rel="icon" href="cel-192.png">
+<link rel="apple-touch-icon" href="cel-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Supercordobés">
 <style>
 :root{--bg:#f6f4ef;--card:#fff;--tx:#1d2a22;--mut:#6b746e;--ac:#0f7a46;--off:#b3261e;--ln:#e4e0d6}
 @media (prefers-color-scheme:dark){:root{--bg:#121513;--card:#1c211e;--tx:#e8ece9;--mut:#9aa39d;--ac:#3fbf7f;--off:#ff7a70;--ln:#2c332f}}
@@ -17,17 +23,21 @@ button{cursor:pointer;width:auto}.pri{background:var(--ac);color:#fff;border-col
 .row{display:flex;gap:8px;align-items:center}.mut{color:var(--mut);font-size:13px}.ok{color:var(--ac)}.mal{color:var(--off)}
 .p{font-size:22px;font-weight:700}.it{padding:10px 0;border-bottom:1px solid var(--ln);cursor:pointer}.it:last-child{border:0}
 img.mini{width:72px;height:72px;object-fit:cover;border-radius:8px;margin:4px 4px 0 0}
+.tabs{flex-wrap:wrap}.per{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.per button[aria-pressed=true]{background:var(--ac);color:#fff;border-color:var(--ac)}
+.gr{display:grid;grid-template-columns:1fr auto auto;gap:2px 10px;font-size:15px}.gr .n{text-align:right;font-variant-numeric:tabular-nums}
+.big{font-size:26px;font-weight:700}h3{font-size:15px;margin:4px 0 6px}
 #toast{position:fixed;left:16px;right:16px;bottom:16px;background:var(--tx);color:var(--bg);padding:12px;border-radius:12px;text-align:center}
 </style>
 </head>
 <body>
 <header><h1>Supercordobés · Celular</h1>
-<div class="tabs" id="tabs" hidden><button type="button" data-t="precios" aria-pressed="true">Precios</button><button type="button" data-t="boletas" aria-pressed="false">Boletas pendientes</button></div>
+<div class="tabs" id="tabs" hidden><button type="button" data-t="precios" aria-pressed="true">Precios</button><button type="button" data-t="boletas" aria-pressed="false">Boletas pendientes</button><button type="button" data-t="ventas" aria-pressed="false">Ventas</button></div>
 <div id="aviso" class="mut"></div></header>
 <main>
 <section id="login" class="card">
   <p>Solo Gustavo. Escribí tu clave.</p>
   <div class="row"><input id="pin" type="password" autocomplete="current-password" placeholder="Clave"><button class="pri" type="button" id="entrar">Entrar</button></div>
+  <label class="mut" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input id="recordar" type="checkbox" style="width:auto" checked> Recordar en este teléfono</label>
 </section>
 
 <section id="precios" hidden>
@@ -49,6 +59,19 @@ img.mini{width:72px;height:72px;object-fit:cover;border-radius:8px;margin:4px 4p
     <p><button class="pri" type="button" id="bGuardar">Guardar boleta pendiente</button></p>
   </div>
   <div class="card"><b>Boletas guardadas</b><div id="bLista" class="mut">—</div></div>
+</section>
+
+<section id="ventas" hidden>
+  <div class="per" id="vPer">
+    <button type="button" data-p="hoy" aria-pressed="true">Hoy</button><button type="button" data-p="ayer" aria-pressed="false">Ayer</button>
+    <button type="button" data-p="semana" aria-pressed="false">7 días</button><button type="button" data-p="mes" aria-pressed="false">Este mes</button>
+  </div>
+  <div class="row"><input id="vDia" type="date" aria-label="Elegir un día"><button type="button" id="vAct">Actualizar</button></div>
+  <div id="vEstado" class="mut" style="margin-top:6px"></div>
+  <div id="vRes"></div>
+  <div class="card"><h3>Buscar una venta</h3>
+    <input id="vQ" placeholder="Número, producto, cajero, cliente u hora (ej. 3341, huevos, 18:3)" autocomplete="off">
+    <div id="vLista"></div></div>
 </section>
 </main>
 <div id="toast" hidden></div>
@@ -74,12 +97,19 @@ async function entrar(){
   const t = $("pin").value; $("pin").value = "";
   const ok = (await huella(t)) === HASH_GUSTAVO || (PRUEBA && normClave(t) === "prueba1234");
   if (!ok){ toast("Clave incorrecta"); try{ await fb("dias/"+hoy()+"/alertas/cel-"+Date.now(), {method:"PUT", body:JSON.stringify({accion:"Clave incorrecta en la página del celular", ts:Date.now()})}); }catch(e){} return; }
-  $("login").hidden = true; $("tabs").hidden = false; $("precios").hidden = false; cargar();
+  if ($("recordar").checked){ try{ localStorage.setItem(CLAVE_LS, HASH_GUSTAVO); }catch(e){} }
+  adentro();
 }
+const CLAVE_LS = PRUEBA ? "celOkPrueba" : "celOk";
+function adentro(){ $("login").hidden = true; $("tabs").hidden = false; $("precios").hidden = false; cargar(); }
+try{ if (localStorage.getItem(CLAVE_LS) === HASH_GUSTAVO) adentro(); }catch(e){}
 $("entrar").addEventListener("click", entrar);
 $("pin").addEventListener("keydown", e => { if (e.key === "Enter") entrar(); });
 $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if(!b) return;
-  [...$("tabs").children].forEach(x => x.setAttribute("aria-pressed", x===b)); $("precios").hidden = b.dataset.t!=="precios"; $("boletas").hidden = b.dataset.t!=="boletas"; if(b.dataset.t==="boletas") listarBoletas(); });
+  [...$("tabs").children].forEach(x => x.setAttribute("aria-pressed", x===b));
+  ["precios","boletas","ventas"].forEach(s => $(s).hidden = b.dataset.t!==s);
+  if(b.dataset.t==="boletas") listarBoletas(); if(b.dataset.t==="ventas" && !VDIAS) cargarVentas(); });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("cel-sw.js", {scope:"celular.html"}).catch(()=>{});
 
 // ---------- Precios ----------
 let P = [], PROD = {};
@@ -167,6 +197,77 @@ async function listarBoletas(){
     $("bLista").innerHTML = l.map(x => `<div class="it">${esc(x.fecha)} · <b>${esc(x.prov)}</b> ${esc(x.nro||"")}<br>${(x.fotos||[]).length} foto(s) · ${x.estado==="cargada"?'<span class="ok">✓ cargada '+esc(x.cargada||"")+'</span>':'<span class="mal">pendiente</span>'}${x.nota?"<br>"+esc(x.nota):""}</div>`).join("") || "Ninguna.";
   }catch(e){ $("bLista").textContent = "No se pudo leer la nube."; }
 }
+
+// ---------- Ventas (solo lectura) ----------
+let VPER = "hoy", VDIAS = null, VENTAS = [], VGEN = 0;
+const ymd = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const dmy = s => s.slice(8,10)+"/"+s.slice(5,7);
+const hora24 = ts => new Date(ts).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false});
+const esBaja = v => v.baja || v.pago === "Baja";
+const esVarios = i => /VARIOS/i.test(i.desc||"") || i.cod === "250" || i.cod === "250V";
+function diasDelPeriodo(){
+  const d = new Date(), out = [];
+  if (VPER === "fecha" && $("vDia").value) return [$("vDia").value];
+  if (VPER === "ayer"){ d.setDate(d.getDate()-1); return [ymd(d)]; }
+  if (VPER === "semana"){ for (let k=0;k<7;k++){ const x=new Date(); x.setDate(x.getDate()-k); out.push(ymd(x)); } return out; }
+  if (VPER === "mes"){ for (let k=1;k<=d.getDate();k++) out.push(ymd(new Date(d.getFullYear(), d.getMonth(), k))); return out.reverse(); }
+  return [ymd(d)];
+}
+async function cargarVentas(){
+  const gen = ++VGEN, dias = diasDelPeriodo(), lista = [];
+  VDIAS = dias; $("vRes").innerHTML = ""; $("vLista").innerHTML = "";
+  let hechos = 0; $("vEstado").textContent = "Trayendo ventas de la nube…";
+  const cola = dias.slice(), errores = [];
+  async function trabajador(){ while (cola.length && gen === VGEN){ const dia = cola.shift();
+    try{ const j = (await fb("dias/"+dia+"/ventas")) || {}; Object.values(j).forEach(v => { if (v && v.ts) lista.push(v); }); }catch(e){ errores.push(dia); }
+    hechos++; if (gen === VGEN) $("vEstado").textContent = `Trayendo ventas… ${hechos} de ${dias.length} días`; } }
+  await Promise.all([0,1,2,3].map(trabajador));
+  if (gen !== VGEN) return;   // el usuario eligió otro período mientras cargaba
+  VENTAS = lista.sort((a,b) => b.ts - a.ts);
+  VENTAS.forEach(v => { v._h = " " + norm([v.nro, v.cajero, v.cliente, v.caja, v.pago, v.comp, hora24(v.ts), (v.items||[]).map(i=>i.desc).join(" ")].join(" ")) + " " + hora24(v.ts) + " "; });
+  const tit = VDIAS.length === 1 ? "el " + dmy(VDIAS[0]) : "del " + dmy(VDIAS.at(-1)) + " al " + dmy(VDIAS[0]);
+  $("vEstado").textContent = `Ventas ${tit} · actualizado ${hora24(Date.now())}` + (errores.length ? ` · no se pudieron leer: ${errores.map(dmy).join(", ")}` : "");
+  resumenVentas(); buscarVentas();
+}
+function tabla(titulo, mapa, total, porFecha){
+  const l = Object.entries(mapa).sort(porFecha ? (a,b) => (b[0].slice(3)+b[0].slice(0,2)).localeCompare(a[0].slice(3)+a[0].slice(0,2)) : (a,b) => b[1].t - a[1].t);
+  return `<div class="card"><h3>${titulo}</h3><div class="gr">${l.map(([k,x]) => `<span>${esc(k||"—")}</span><span class="n mut">${x.n}</span><span class="n"><b>${fmt(x.t)}</b>${total?` <span class="mut">${Math.round(x.t*100/total)}%</span>`:""}</span>`).join("")}</div></div>`;
+}
+function resumenVentas(){
+  const ok = VENTAS.filter(v => !esBaja(v)), bajas = VENTAS.filter(esBaja);
+  const total = ok.reduce((s,v) => s + (+v.total||0), 0);
+  const suma = (m, k, t) => { (m[k] = m[k] || {n:0,t:0}); m[k].n++; m[k].t += t; };
+  const caja = {}, pago = {}, cajero = {}, dia = {}, prod = {}; let varios = 0, nVarios = 0;
+  ok.forEach(v => { const t = +v.total||0; suma(caja, v.caja, t); suma(pago, v.pago, t); suma(cajero, v.cajero, t); suma(dia, dmy(v.dia||ymd(new Date(v.ts))), t);
+    (v.items||[]).forEach(i => { const imp = +i.importe||0; if (esVarios(i)){ varios += imp; nVarios++; return; }
+      const p = prod[i.cod] = prod[i.cod] || {desc:i.desc, q:0, t:0, n:0}; p.q += +i.q||0; p.t += imp; p.n++; }); });
+  const top = Object.values(prod).sort((a,b) => b.t - a.t).slice(0, 20);
+  const q = x => (Math.round(x*1000)/1000).toLocaleString("es-AR");
+  $("vRes").innerHTML =
+    `<div class="card"><div class="mut">Total vendido</div><div class="big">${fmt(total)}</div>
+      <div class="mut">${ok.length} ventas · ticket promedio ${fmt(ok.length ? total/ok.length : 0)}${bajas.length ? ` · ${bajas.length} bajas/consumo interno` : ""}</div>
+      ${varios ? `<div style="margin-top:6px">Cobrado por <b>"varios"</b> (sin producto): <b>${fmt(varios)}</b> <span class="mut">en ${nVarios} renglones · ${total?Math.round(varios*100/total):0}% del total</span></div>` : ""}</div>`
+    + tabla("Por caja", caja, total) + tabla("Por forma de pago", pago, total)
+    + (VDIAS.length > 1 ? tabla("Por día", dia, total, true) : "") + tabla("Por cajero", cajero, total)
+    + `<div class="card"><h3>Productos que más vendieron (en plata, sin "varios")</h3><div class="gr">${top.map(p => `<span>${esc(p.desc)}</span><span class="n mut">${q(p.q)}</span><span class="n"><b>${fmt(p.t)}</b></span>`).join("") || '<span class="mut">Sin ventas.</span>'}</div><div class="mut" style="margin-top:6px">La columna gris es la cantidad (unidades o kilos).</div></div>`;
+}
+function buscarVentas(){
+  const t = norm($("vQ").value).split(" ").filter(Boolean), l = $("vLista");
+  const hits = (t.length ? VENTAS.filter(v => t.every(w => v._h.includes(" "+w) || v._h.includes(w))) : VENTAS).slice(0, 60);
+  l.innerHTML = (t.length ? `<div class="mut" style="margin-top:6px">${hits.length === 60 ? "Primeras 60" : hits.length} venta(s)</div>` : `<div class="mut" style="margin-top:6px">Últimas ventas (tocá una para ver el detalle)</div>`)
+    + hits.map((v, k) => `<div class="it" data-k="${VENTAS.indexOf(v)}"><b>${fmt(v.total)}</b> · ${esc(v.pago)} · Nº ${esc(v.nro)}<br><span class="mut">${dmy(v.dia||ymd(new Date(v.ts)))} ${hora24(v.ts)} · ${esc(v.caja)} · ${esc(v.cajero)}${v.cliente?" · "+esc(v.cliente):""} · ${esc(v.comp||"")}${esBaja(v)?" · <b>BAJA</b> "+esc(v.motivo||""):""}</span><div class="det" hidden></div></div>`).join("");
+}
+$("vLista").addEventListener("click", e => { const it = e.target.closest("[data-k]"); if (!it) return; const d = it.querySelector(".det"), v = VENTAS[+it.dataset.k];
+  if (!d.hidden){ d.hidden = true; return; }
+  d.innerHTML = `<div class="gr" style="margin-top:6px">${(v.items||[]).map(i => `<span>${esc(i.desc)}</span><span class="n mut">${(+i.q).toLocaleString("es-AR")}</span><span class="n">${fmt(i.importe)}</span>`).join("")}</div>`
+    + (v.arca && v.arca.cae ? `<div class="mut">Factura ${v.arca.tipo===1?"A":v.arca.tipo===6?"B":v.arca.tipo} ${String(v.arca.pv).padStart(4,"0")}-${String(v.arca.nro).padStart(8,"0")} · CAE ${esc(v.arca.cae)}</div>` : "")
+    + (v.ajusteMotivo ? `<div class="mut">Ajuste: ${esc(v.ajusteMotivo)}</div>` : "");
+  d.hidden = false; });
+$("vQ").addEventListener("input", buscarVentas);
+$("vPer").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if (!b) return; VPER = b.dataset.p; $("vDia").value = "";
+  [...$("vPer").children].forEach(x => x.setAttribute("aria-pressed", x===b)); cargarVentas(); });
+$("vDia").addEventListener("change", () => { if (!$("vDia").value) return; VPER = "fecha"; [...$("vPer").children].forEach(x => x.setAttribute("aria-pressed", false)); cargarVentas(); });
+$("vAct").addEventListener("click", cargarVentas);
 </script>
 </body>
 </html>
