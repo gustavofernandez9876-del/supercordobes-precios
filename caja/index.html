@@ -853,6 +853,11 @@ function leerEtiqueta(t){
     if (!best||score>best.score) best={p,cod:c,val,score};
   }
   if (best && best.score>=3) return best;
+  // PLU que está en la balanza pero no en la caja (21/11): se cobra el importe impreso como VARIOS y queda el PLU en la venta para cargarlo después.
+  { const f=fmts[0]; if (t.startsWith(f.pf) && f.pf.length+f.dC+f.dV+1===13){
+      const c=sinCeros(t.substr(f.pf.length,f.dC)), val=+t.substr(f.pf.length+f.dC,f.dV)/Math.pow(10,f.dec);
+      if (val>0){ const b=porCod.get("250")||{cod:"250",bc:"",plu:"",desc:"PRODUCTOS VARIOS",rubro:"GENERAL",marca:"",empresa:"",precio:0,iva:21,efe:true};
+        return {p:Object.assign({},b,{cod:"250V",desc:"VARIOS (BALANZA) PLU "+c+" SIN CARGAR",precio:0,iva:21}),cod:c,val,score:1,desconocido:true}; } } }
   return {p:null,cod:t.substr(2,5),val:0};
 }
 function agregarEtiqueta(e){
@@ -861,7 +866,9 @@ function agregarEtiqueta(e){
   let l;
   if (BAL.modo==="peso"){ l={p:e.p,q:+e.val.toFixed(3)}; }
   else { const kg = e.p.precio>0 ? +(e.val/e.p.precio).toFixed(3) : 1; l={p:e.p,q:kg,fijo:e.val,bal:true}; }
-  carrito.push(l); ultimo=e.p; render(e.p); return true;
+  carrito.push(l); ultimo=e.p; render(e.p);
+  if (e.desconocido) aviso("PLU "+e.cod+" de la balanza no está cargado en la caja: se cobra el importe de la etiqueta como VARIOS.");
+  return true;
 }
 function agregar(texto){
   let t = texto.trim(), q = 1;
