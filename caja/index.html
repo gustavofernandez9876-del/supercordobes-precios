@@ -96,6 +96,11 @@ td.r,th.r{text-align:right}
 .adj input[type=text]{flex:1}
 .cobrar{width:100%;font-size:22px;padding:14px;font-family:var(--display);font-weight:700;letter-spacing:.04em}
 .cobrar:disabled{opacity:.45;cursor:not-allowed}
+.total{padding:10px 14px}.total .big{font-size:48px}
+.side .panel{padding:10px 12px}
+.side .chips{margin-top:4px}
+.masOpc{margin-top:10px;font-size:13px}.masOpc summary{cursor:pointer;color:var(--muted);font-weight:600}
+.masOpc[open] summary{margin-bottom:4px}
 .cobrarBox{position:sticky;bottom:10px;z-index:30;background:var(--bg,#fff);border-radius:10px;padding:8px;box-shadow:0 -6px 18px rgba(0,0,0,.18)}
 .impChk{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:700;margin:0 0 8px;cursor:pointer}
 .impChk input{width:24px;height:24px}
@@ -259,6 +264,20 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <div class="panel">
       <div class="label">Comprobante</div>
       <div class="chips" id="comps"></div>
+      <div class="label" style="margin-top:10px">Forma de pago</div>
+      <div class="chips" id="pagos"></div>
+      <div class="vuelto" id="vueltoBox" hidden>
+        <label for="paga">Paga con</label><input id="paga" type="number" min="0" step="100" inputmode="numeric">
+        <span>Vuelto: <b class="num" id="vuelto">$ 0</b></span>
+      </div>
+      <div id="spWrap" style="margin-top:8px;font-size:14px">
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="spOn"> Pago dividido (dos medios)</label>
+        <div id="spBox" hidden style="margin-top:6px;display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center">
+          <span id="spLab1">Efectivo</span><input id="spM1" type="number" min="0" step="100" inputmode="numeric" placeholder="Monto del primer medio" style="border:1px solid var(--line);border-radius:6px;padding:6px">
+          <select id="spMed2"><option>QR</option><option>Débito</option><option>Crédito</option><option>Transferencia</option><option>Cuenta corriente</option></select><b class="num" id="spResto">$ 0</b>
+          <small style="grid-column:1/-1;color:var(--muted)" id="spNota">El primer medio es el que está marcado arriba. El descuento por efectivo se aplica solo sobre la parte pagada en efectivo.</small>
+        </div>
+      </div>
       <div class="ccbox" id="faBox" hidden>
         <label class="label" for="faBus" id="faTit">Cliente de la factura A (obligatorio)</label>
         <div id="faSel"></div>
@@ -279,20 +298,13 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
           </div>
         </div>
       </div>
-      <div class="label" style="margin-top:14px">Forma de pago</div>
-      <div class="chips" id="pagos"></div>
-      <div class="vuelto" id="vueltoBox" hidden>
-        <label for="paga">Paga con</label><input id="paga" type="number" min="0" step="100" inputmode="numeric">
-        <span>Vuelto: <b class="num" id="vuelto">$ 0</b></span>
+      <div class="ccbox" id="ccBox" hidden>
+        <label class="label" for="ccCli">Cliente de cuenta corriente</label>
+        <select id="ccCli"></select>
+        <div id="ccEstado"></div>
       </div>
-      <div id="spWrap" style="margin-top:8px;font-size:14px">
-        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="spOn"> Pago dividido (dos medios)</label>
-        <div id="spBox" hidden style="margin-top:6px;display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center">
-          <span id="spLab1">Efectivo</span><input id="spM1" type="number" min="0" step="100" inputmode="numeric" placeholder="Monto del primer medio" style="border:1px solid var(--line);border-radius:6px;padding:6px">
-          <select id="spMed2"><option>QR</option><option>Débito</option><option>Crédito</option><option>Transferencia</option><option>Cuenta corriente</option></select><b class="num" id="spResto">$ 0</b>
-          <small style="grid-column:1/-1;color:var(--muted)" id="spNota">El primer medio es el que está marcado arriba. El descuento por efectivo se aplica solo sobre la parte pagada en efectivo.</small>
-        </div>
-      </div>
+      <details class="masOpc" id="masOpc">
+        <summary>Descuentos y recargos</summary>
       <div class="cfg">
         <span>Descuentos por efectivo:</span>
         <label for="cfgEfe">Mercadería</label><span><input id="cfgEfe" type="number" min="0" max="100" step="1" value="5" readonly>%</span>
@@ -301,17 +313,13 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
         <button class="btn" id="cfgAbrir" type="button">Cambiar (pide clave)</button>
         <span id="cfgClave" hidden><input id="cfgPin" type="password" autocomplete="off" placeholder="Clave" aria-label="Clave para cambiar descuentos" style="width:130px;text-align:left"> <button class="btn primary" id="cfgOk" type="button">Entrar</button></span>
       </div>
-      <div class="ccbox" id="ccBox" hidden>
-        <label class="label" for="ccCli">Cliente de cuenta corriente</label>
-        <select id="ccCli"></select>
-        <div id="ccEstado"></div>
-      </div>
-      <div class="label" style="margin-top:14px">Descuento o recargo especial</div>
+      <div class="label" style="margin-top:8px">Descuento o recargo especial</div>
       <div class="adj">
         <select id="adjTipo" aria-label="Tipo"><option value="-1">Descuento</option><option value="1">Recargo</option></select>
         <input id="adjPct" type="number" min="0" max="100" step="1" value="0" aria-label="Porcentaje">%
         <input id="adjMot" type="text" placeholder="Motivo (queda registrado)" aria-label="Motivo">
       </div>
+      </details>
     </div>
 
     <div class="cobrarBox"><label class="impChk"><input type="checkbox" id="chkImp"> Imprimir ticket</label><button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button><button class="btn" id="btnConsumo" type="button" style="margin-top:6px;width:100%">Baja de productos (rotura / uso interno / faltante)</button></div>
