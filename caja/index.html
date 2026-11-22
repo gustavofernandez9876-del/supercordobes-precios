@@ -1,4 +1,17 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.total .big{font-size:42px}.total .rows{margin-top:4px;gap:2px}
+.side{gap:8px}.side .chip{padding:4px 10px;font-size:13px}.side .chips{gap:4px}
+.side .label{font-size:11px}
+#faSel>.hint,#faRes>.hint{display:none}
+#faBuscar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}#faBus{flex:1;width:auto!important;padding:6px 8px!important}#faNuevoBtn{margin-top:0!important;padding:5px 10px}#faRes,#faNuevo{flex-basis:100%}
+.side .ccbox{margin-top:6px;gap:4px}
+#vueltoBox{margin-top:6px}#spWrap{margin-top:4px!important;font-size:13px!important}
+.cobrarBox{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+.cobrarBox .impChk{margin:0}.cobrarBtns{grid-column:1/-1;margin-top:0}.cobrarBtns .btn{font-size:13px}
+#faBus{order:0}#faNuevoBtn{order:1}#faRes{order:2}#faNuevo{order:3}
+.masOpc>.label{display:none}.masOpc .adj{margin-top:4px}
+.masOpc .cfg input{padding:2px 4px}.masOpc .cfg .btn{padding:3px 8px}
+.side .adj input,.side .adj select{padding:4px 6px}
+</style></head><body>
 <title>Caja Supercordobés</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap">
@@ -99,8 +112,12 @@ td.r,th.r{text-align:right}
 .total{padding:10px 14px}.total .big{font-size:48px}
 .side .panel{padding:10px 12px}
 .side .chips{margin-top:4px}
-.masOpc{margin-top:10px;font-size:13px}.masOpc summary{cursor:pointer;color:var(--muted);font-weight:600}
-.masOpc[open] summary{margin-bottom:4px}
+.masOpc{margin-top:6px;font-size:13px}
+.masOpc .cfg{margin-top:4px;gap:4px 10px}.masOpc .label{margin-top:6px!important}
+.side .label{margin-bottom:0}
+.cobrarBtns{display:flex;gap:6px;margin-top:6px}.cobrarBtns .btn{flex:1;padding:6px 8px}
+.cobrarBox .impChk{font-size:15px;margin:0 0 6px}.cobrarBox .impChk input{width:20px;height:20px}
+.cobrarBox .cobrar{padding:10px}
 .cobrarBox{position:sticky;bottom:10px;z-index:30;background:var(--bg,#fff);border-radius:10px;padding:8px;box-shadow:0 -6px 18px rgba(0,0,0,.18)}
 .impChk{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:700;margin:0 0 8px;cursor:pointer}
 .impChk input{width:24px;height:24px}
@@ -303,8 +320,7 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
         <select id="ccCli"></select>
         <div id="ccEstado"></div>
       </div>
-      <details class="masOpc" id="masOpc">
-        <summary>Descuentos y recargos</summary>
+      <div class="masOpc" id="masOpc">
       <div class="cfg">
         <span>Descuentos por efectivo:</span>
         <label for="cfgEfe">Mercadería</label><span><input id="cfgEfe" type="number" min="0" max="100" step="1" value="5" readonly>%</span>
@@ -319,12 +335,11 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
         <input id="adjPct" type="number" min="0" max="100" step="1" value="0" aria-label="Porcentaje">%
         <input id="adjMot" type="text" placeholder="Motivo (queda registrado)" aria-label="Motivo">
       </div>
-      </details>
+      </div>
     </div>
 
-    <div class="cobrarBox"><label class="impChk"><input type="checkbox" id="chkImp"> Imprimir ticket</label><button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button><button class="btn" id="btnConsumo" type="button" style="margin-top:6px;width:100%">Baja de productos (rotura / uso interno / faltante)</button></div>
+    <div class="cobrarBox"><label class="impChk"><input type="checkbox" id="chkImp"> Imprimir ticket</label><button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button><div class="cobrarBtns"><button class="btn" id="btnConsumo" type="button">Baja (rotura / uso interno / faltante)</button><button class="btn" id="btnCancel" type="button">Cancelar venta</button></div></div>
 <div id="cxModal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:flex;align-items:center;justify-content:center"><div style="background:var(--card,#fff);color:inherit;padding:18px;border-radius:10px;width:min(420px,92vw)"><h3 style="margin-top:0">Baja de productos</h3><div class="hint">Los productos del carrito se descuentan del stock sin cobrar y quedan registrados como baja. No suma a la caja ni va a ARCA.</div><label style="display:block;margin-top:10px">Motivo</label><select id="cxMot" style="width:100%"><option>Roto / dañado</option><option>Vencido</option><option>Faltante (no está en góndola ni depósito)</option><option>Uso interno del local / limpieza</option><option>Bolsas para la caja</option><option>Consumo del personal</option><option>Degustación / muestra</option><option>Otro</option></select><label style="display:block;margin-top:8px">Detalle (opcional)</label><input id="cxDet" type="text" style="width:100%" placeholder="Ej. bolsas para la caja 2"><div id="cxRes" class="hint" style="margin-top:8px"></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="cxNo" type="button" style="flex:1">Cancelar</button><button class="btn primary" id="cxOk" type="button" style="flex:1">Registrar baja</button></div></div></div>
-    <button class="btn" id="btnCancel" type="button">Cancelar venta</button>
 
     <div class="panel">
       <div class="label">Cuentas corrientes · plazo 30 días</div>
