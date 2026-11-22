@@ -341,8 +341,9 @@ table.lt tbody tr:hover,table.lt tbody tr.sel{background:var(--soft)}
     <div class="cobrarBox"><label class="impChk"><input type="checkbox" id="chkImp"> Imprimir ticket</label><button class="btn primary cobrar" id="btnCobrar" type="button" disabled>COBRAR</button><div class="cobrarBtns"><button class="btn" id="btnConsumo" type="button">Baja (rotura / uso interno / faltante)</button><button class="btn" id="btnCancel" type="button">Cancelar venta</button></div></div>
 <div id="cxModal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:flex;align-items:center;justify-content:center"><div style="background:var(--card,#fff);color:inherit;padding:18px;border-radius:10px;width:min(420px,92vw)"><h3 style="margin-top:0">Baja de productos</h3><div class="hint">Los productos del carrito se descuentan del stock sin cobrar y quedan registrados como baja. No suma a la caja ni va a ARCA.</div><label style="display:block;margin-top:10px">Motivo</label><select id="cxMot" style="width:100%"><option>Roto / dañado</option><option>Vencido</option><option>Faltante (no está en góndola ni depósito)</option><option>Uso interno del local / limpieza</option><option>Bolsas para la caja</option><option>Consumo del personal</option><option>Degustación / muestra</option><option>Otro</option></select><label style="display:block;margin-top:8px">Detalle (opcional)</label><input id="cxDet" type="text" style="width:100%" placeholder="Ej. bolsas para la caja 2"><div id="cxRes" class="hint" style="margin-top:8px"></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="cxNo" type="button" style="flex:1">Cancelar</button><button class="btn primary" id="cxOk" type="button" style="flex:1">Registrar baja</button></div></div></div>
 
-    <!-- Lista de deudores oculta en la caja (la ven los clientes). Se consulta y cobra desde el botón "Cuentas corrientes". -->
-    <div class="panel" id="ccPanel" hidden>
+    <!-- Espacio que empuja las cuentas corrientes fuera de la pantalla: se ven solo bajando con el scroll. -->
+    <div id="ccEspacio" aria-hidden="true"></div>
+    <div class="panel" id="ccPanel">
       <div class="label">Cuentas corrientes · plazo 30 días</div>
       <div class="cclist num" id="ccList"></div>
       <div class="adj" style="margin-top:10px">
@@ -1359,6 +1360,13 @@ $("comps").addEventListener("click", e=>{ const b=e.target.closest("[data-comp]"
 ["caja","turno"].forEach(id=>$(id).addEventListener("change", renderTurno));
 $("ccCli").addEventListener("change", e=>{ ccSel = e.target.value; render(); });
 $("btnPagoCC").addEventListener("click", pagarCC);
+// Cuentas corrientes debajo del borde de la pantalla (que no se vean sin bajar)
+function ajustarCCesp(){ const sp=$("ccEspacio"), pn=$("ccPanel"); if(!sp||!pn||!pn.offsetParent) return;
+  const act=parseFloat(sp.style.height)||0, top=pn.getBoundingClientRect().top+window.scrollY-act;
+  const h=Math.max(0, Math.ceil(window.innerHeight+30-top)); if(Math.abs(h-act)>2) sp.style.height=h+"px"; }
+window.addEventListener("resize", ajustarCCesp); window.addEventListener("load", ajustarCCesp);
+setInterval(ajustarCCesp, 1000); setTimeout(ajustarCCesp, 0);
+
 $("btnPagoTotal").addEventListener("click", ()=>{ const c=CC.find(x=>x.id===$("pgCli").value); if (c) $("pgMonto").value=c.saldo; });
 $("btnCobrar").addEventListener("click", cobrar);
 $("btnConsumo").addEventListener("click",()=>{ if(!carrito.length){ aviso("Primero pasá los productos que se dan de baja."); return; }
