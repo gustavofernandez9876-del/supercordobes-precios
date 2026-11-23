@@ -1786,18 +1786,59 @@ function fichaCliente(c){
      <div class="lin"><span>Saldo</span><b class="num">${fmt(cc.saldo)}</b></div>
      <div class="lin"><span>Estado</span><span class="pill ${est.cls}">${est.txt}</span></div>
      ${cc.desde?`<div class="lin"><span>Deuda desde</span><span>${new Date(cc.desde+"T12:00").toLocaleDateString("es-AR")}</span></div>`:""}
-     <div class="label" style="margin-top:8px">Movimientos</div>
-     ${cc.movs.slice().reverse().map(m=>`<div class="lin num"><span>${new Date(m.fecha+"T12:00").toLocaleDateString("es-AR")} · ${m.tipo}${m.medio?" ("+m.medio+")":""}</span><span style="color:${m.monto<0?"var(--accent)":"inherit"}">${m.monto<0?"−":""}${fmt(Math.abs(m.monto))}</span></div>`).join("")||'<div class="hint">Sin movimientos.</div>'}`
+     <div class="label" style="margin-top:8px">Movimientos <span style="text-transform:none;font-weight:400">(clic para ver la boleta)</span></div>
+     ${cc.movs.map((m,ix)=>({m,ix})).reverse().map(({m,ix})=>`<div class="lin num movCli" data-movix="${ix}" title="Clic para ver la boleta" style="cursor:pointer"><span>${new Date(m.fecha+"T12:00").toLocaleDateString("es-AR")} · ${m.tipo}${m.medio?" ("+m.medio+")":""}</span><span style="color:${m.monto<0?"var(--accent)":"inherit"}">${m.monto<0?"−":""}${fmt(Math.abs(m.monto))}</span></div>`).join("")||'<div class="hint">Sin movimientos.</div>'}`
      : `<div class="hint">No tiene cuenta corriente.</div><button class="btn" type="button" id="fcHabCC" style="margin-top:6px">Habilitar cuenta corriente</button>`}</div>
    <div class="seccion"><div class="label">Comprobantes (${cs.length})</div>
-     ${cs.map(v=>`<div class="lin num"><span>${v.nc?'<b style="color:var(--off)">NC</b> ':""}#${v.nro} · ${v.fecha} · ${escH(v.comp)}</span><b>${fmt(v.total)}</b></div>`).join("")||'<div class="hint">Todavía no tiene comprobantes en este sistema.</div>'}</div>`;
+     ${cs.map(v=>`<div class="lin num movCli" data-vcaja="${escH(v.caja)}" data-vnro="${escH(v.nro)}" title="Clic para ver la boleta" style="cursor:pointer"><span>${v.nc?'<b style="color:var(--off)">NC</b> ':""}#${v.nro} · ${v.fecha} · ${escH(v.comp)}</span><b>${fmt(v.total)}</b></div>`).join("")||'<div class="hint">Todavía no tiene comprobantes en este sistema.</div>'}</div>`;
 }
 $("clChips").addEventListener("click",e=>{ const b=e.target.closest("[data-f]"); if(b){ clFiltro=b.dataset.f; pintarClientes(); }});
 $("clQ").addEventListener("input",()=>pintarClientes());
 $("clQ").addEventListener("keydown",e=>{ if(e.key==="Enter" && clPrimero){ e.preventDefault(); clSel=clPrimero; pintarClientes(); } });
 $("clTb").addEventListener("click",e=>{ const tr=e.target.closest("[data-cod]"); if(tr){ clSel=tr.dataset.cod; pintarClientes(); }});
+// ---- Ver la boleta de un movimiento de cuenta corriente (22/11): productos, cantidades, día, hora, caja y vendedor ----
+function buscarVentaLocal(nro,caja,cliente){
+  const todas=ventas.concat(window.__vn||[], (typeof ventasNube!=="undefined"&&ventasNube)||[]);
+  return todas.find(v=>String(v.nro)===String(nro) && (!caja||v.caja===caja) && (!cliente||!v.cliente||v.cliente===cliente))||null;
+}
+async function buscarVentaNube(nro,fecha,cliente){
+  const dias=[fecha]; const d0=new Date(fecha+"T12:00"); dias.push(diaISO(new Date(d0.getTime()-864e5)), diaISO(new Date(d0.getTime()+864e5)));
+  for (const d of dias){ try{ const r=await fetch(`${FB_URL}/${FB_K}/dias/${d}/ventas.json`); if(!r.ok) continue; const j=(await r.json())||{};
+      const vs=Object.values(j).filter(v=>String(v.nro)===String(nro)); const v=vs.find(x=>x.cliente===cliente)||vs[0]; if(v) return v; }catch(e){} }
+  return null;
+}
+function mostrarVentaCli(v,cliente,extra){
+  if(!v){ aviso("No encuentro esa boleta en la caja ni en la nube."); return; }
+  const its=v.items||[], uds=its.reduce((a,i)=>a+(+i.q||0),0);
+  $("ticket").innerHTML=`<h3>${v.nc?"Nota de crédito":escH(v.comp||"Boleta")} #${escH(v.nro)}</h3>
+   <div style="font-size:15px;line-height:1.5"><b>Día:</b> ${escH(v.fecha||"")} · <b>Hora:</b> ${escH((v.hora||"").replace(/\u00a0/g," "))}<br><b>Vendedor:</b> ${escH(v.cajero||v.responsable||"—")} · <b>Caja:</b> ${escH(v.caja||"—")}${cliente?`<br><b>Cliente:</b> ${escH(cliente)}`:""}</div><hr>
+   <div class="tl" style="font-weight:700"><span>Cant. · Producto</span><span>Importe</span></div>`+
+   its.map(i=>`<div class="tl num"><span>${escH(i.q)} × ${escH(i.desc)}</span><span>${fmt(i.importe)}</span></div>`).join("")+
+   `<hr><div class="tl num"><span>${its.length} productos · ${Math.round(uds*100)/100} unidades</span><span></span></div>
+   <div class="tl num" style="font-size:20px;font-weight:700"><span>TOTAL</span><span>${fmt(v.total)}</span></div><div class="tl"><span>Pago</span><span>${escH(v.pago||"")}</span></div>${extra||""}
+   <button class="btn" id="btnImpMovCli" type="button" style="width:100%;margin-top:14px">🖨 Reimprimir ticket</button>
+   <button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:8px">Cerrar</button>`;
+  $("btnImpMovCli").onclick=()=>imprimirTicket(v); $("modal").hidden=false;
+}
+async function abrirMovCli(cc,m){
+  if (m.venta!=null && m.venta!==""){
+    let v=buscarVentaLocal(m.venta,null,cc.nombre);
+    if(!v){ aviso("Buscando la boleta en la nube…"); v=await buscarVentaNube(m.venta,m.fecha,cc.nombre); }
+    mostrarVentaCli(v,cc.nombre); return;
+  }
+  const b=(cc.boletas||[]).find(x=>(m.tipo||"").includes(x.nro) || (m.ref&&m.ref===x.nro));
+  if (b){ verBoletaCC(cc.id,b.nro); return; }
+  $("ticket").innerHTML=`<h3>${escH(m.tipo)}</h3><div style="font-size:15px"><b>Día:</b> ${new Date(m.fecha+"T12:00").toLocaleDateString("es-AR")}${m.medio?` · <b>Medio:</b> ${escH(m.medio)}`:""}<br><b>Cliente:</b> ${escH(cc.nombre)}</div><hr>
+   <div class="tl num" style="font-size:20px;font-weight:700"><span>Importe</span><span>${m.monto<0?"−":""}${fmt(Math.abs(m.monto))}</span></div>
+   <div class="hint" style="margin-top:8px">Este movimiento no es una venta (pago, descuento o saldo inicial): no tiene productos.</div>
+   <button class="btn primary" id="btnVolverNC" type="button" style="width:100%;margin-top:14px">Cerrar</button>`;
+  $("modal").hidden=false;
+}
 $("clFicha").addEventListener("click",e=>{
   const c=listaClientes().find(x=>x.cod===clSel); if(!c) return;
+  const mvEl=e.target.closest(".movCli");
+  if (mvEl){ if(mvEl.dataset.vnro){ mostrarVentaCli(buscarVentaLocal(mvEl.dataset.vnro,mvEl.dataset.vcaja,null), c.razon); return; }
+    const cc=ccDe(c); const m=cc&&cc.movs[+mvEl.dataset.movix]; if(m) abrirMovCli(cc,m); return; }
   if (e.target.id==="fcGuardar"){
     const num=$("fcCuit").value.replace(/\D/g,""), cond=$("fcCond").value, ed={razon:$("fcRaz").value.trim().toUpperCase(), cond, dom:$("fcDom").value.trim().toUpperCase(), cuit:"", doc:""};
     if (!ed.razon){ aviso("Falta la razón social."); return; }
