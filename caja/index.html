@@ -1086,6 +1086,7 @@ function detalleCta(c){
 function verBoletaCC(id,nro){ const c=CC.find(x=>x.id===id); if(!c) return; const b=(c.boletas||[]).find(x=>x.nro===nro); if(!b) return;
   const n=String(nro).replace("#",""); const todas=ventas.concat(window.__vn||[],ventasNube||[]);
   const v=b.tipo==="Caja"&&/^\d+$/.test(n)?todas.find(x=>String(x.nro)===n && (x.cliente===c.nombre||!x.cliente)):null;
+  if(!v && b.tipo==="Caja" && /^\d+$/.test(n)){ aviso("Buscando la boleta en la nube…"); buscarVentaNube(n,b.fecha,c.nombre).then(vn=>{ if(vn) mostrarVentaCli(vn,c.nombre,`<div class="tl num"><span>Debe</span><span>${fmt(b.deuda)}</span></div>`); else aviso("No encuentro esa boleta en la nube."); }); return; }
   const mv=(c.movs||[]).find(m=>m.venta==n || (m.tipo||"").includes(nro) || ((m.tipo||"").startsWith("Compra (") && m.fecha===b.fecha && Math.abs(m.monto-b.total)<1));
   const tipo=b.tipo==="FA"?"Factura A":b.tipo==="FB"?"Factura B":b.tipo;
   $("ticket").innerHTML=`<h3>${escH(tipo)} ${escH(nro)}</h3><div style="color:var(--muted)">${new Date(b.fecha+"T12:00").toLocaleDateString("es-AR")} · ${escH(c.nombre)}${v?" · "+escH(v.caja)+" · "+escH(v.cajero)+" · "+escH(v.hora||""):""}</div><hr>`+
