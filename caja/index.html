@@ -701,8 +701,23 @@ let pago = "Efectivo", comp = "Factura B", ultimo = null, nro = 1;
 // Arranque real del sistema (08/11/2026): borra una sola vez, en cada máquina, las ventas, cobros y cierres de práctica.
 try{ if(localStorage.getItem("cajaInicio")!=="2026-11-08"){ ["cajaVentas","cajaCobrosCC","cajaCierres","cajaPend"].forEach(k=>localStorage.removeItem(k)); localStorage.setItem("cajaInicio","2026-11-08"); } }catch(e){}
 let ventas = [];
-try { ventas = JSON.parse(localStorage.getItem("cajaVentas")||"[]"); nro = (ventas.at(-1)?.nro||0)+1; } catch(e) {}
-const guardar = () => { try { localStorage.setItem("cajaVentas", JSON.stringify(ventas)); } catch(e) {} };
+try { ventas = JSON.parse(localStorage.getItem("cajaVentas")||"[]"); nro = Math.max((ventas.at(-1)?.nro||0)+1, ventas.reduce((m,v)=>Math.max(m,+(v&&v.nro)||0),0)+1, +localStorage.getItem("cajaNro")||0); } catch(e) {}
+// Memoria de la compu (Gustavo 23/11): el navegador guarda ~5 MB. En Caja 1 se llenó el 21/11 con todas las ventas desde el
+// 08/11 y la caja dejó de guardar SIN AVISAR: al recargar volvía atrás (números repetidos, cierres que tomaban el turno anterior
+// y dejaban afuera ventas). Todo está en Firebase: acá quedan los últimos días + lo que falta cerrar o mandar a ARCA.
+const VENTAS_DIAS=10; let avisoMem=0;
+function ventasAGuardar(dias){ const lim=Date.now()-dias*864e5;
+  // Lo que falta cerrar se guarda siempre (aunque tenga días), salvo lo anterior al último cierre de esa caja (ya cerrado).
+  const uc={}; const ult=c=>{ if(!(c in uc)){ try{ uc[c]=ultimoCierreTs(c); }catch(e){ let m=0; try{ JSON.parse(localStorage.getItem("cajaCierres")||"[]").forEach(x=>{ if(x&&x.caja===c){ const t=+x.ts||(/^C\d{12,}$/.test(x.id||"")?+x.id.slice(1):0); if(t>m) m=t; } }); }catch(e2){} uc[c]=m; } } return uc[c]; };
+  return ventas.filter(v=>v && (!v.ts || v.ts>=lim || (v.arca&&v.arca.pendiente) || (!v.cierre && v.ts>ult(v.caja)))); }
+const guardar = () => {
+  try { localStorage.setItem("cajaNro", String(nro)); } catch(e) {}
+  for (const d of [VENTAS_DIAS,6,4,2,1]) { try { localStorage.setItem("cajaVentas", JSON.stringify(ventasAGuardar(d))); window.__memLlena=false; return true; } catch(e) {} }
+  window.__memLlena=true;
+  if (Date.now()-avisoMem>600000) { avisoMem=Date.now(); setTimeout(()=>{ const m="⚠ La memoria de esta compu está llena y la caja no puede guardar las ventas acá (en la nube sí quedan). NO recargar la página y avisar a Gustavo."; try{ aviso(m); }catch(e){ alert(m); } },0); }
+  return false;
+};
+guardar();
 
 // Cálculo de un renglón: oferta por cantidad, luego descuento por efectivo (FyV 20%, pack cerrado 10% que reemplaza al 5%, resto 5%).
 // Las unidades que ya entraron en una oferta por cantidad no suman además el descuento por efectivo.
@@ -1203,7 +1218,7 @@ $("cobX").addEventListener("click",()=>$("cobModal").hidden=true); $("cobCancel"
 $("cobOk").addEventListener("click",registrarCobro);
 function renderTurno(){
   const caja=$("caja").value, turno=$("turno").value;
-  const vs = ventas.filter(v=>v.caja===caja && v.turno===turno && v.fecha===hoy() && !v.cierre);
+  let vs; try { vs = abiertasDe(ventas,caja); } catch(e) { vs = ventas.filter(v=>v.caja===caja && v.turno===turno && v.fecha===hoy() && !v.cierre); }
   const by = k => { const o={}; vs.forEach(v=>o[v[k]]=(o[v[k]]||0)+v.total); return o; };
   const bp = by("pago"), bc = by("comp");
   const tot = vs.reduce((a,v)=>a+v.total,0);
@@ -1211,7 +1226,7 @@ function renderTurno(){
     PAGOS.map(x=>`<div><span>${x}</span><b>${fmt(bp[x]||0)}</b></div>`).join("") +
     COMPS.map(x=>`<div><span>${x}</span><b>${fmt(bc[x]||0)}</b></div>`).join("") +
     `<div><span>Notas de crédito (${vs.filter(v=>v.nc).length})</span><b style="color:var(--off)">${fmt(vs.filter(v=>v.nc).reduce((a,v)=>a+v.total,0))}</b></div>` +
-    (()=>{ const cs=cobros.filter(c=>c.caja===caja&&c.turno===turno&&c.fecha===hoy()&&!c.cierre); const bm={}; cs.forEach(c=>{ if(c.monto>0) bm[c.medio]=(bm[c.medio]||0)+c.monto; }); const ds=cs.reduce((a,c)=>a+(c.descuento||0),0);
+    (()=>{ let cs; try { cs=abiertasDe(cobros,caja); } catch(e) { cs=cobros.filter(c=>c.caja===caja&&c.turno===turno&&c.fecha===hoy()&&!c.cierre); } const bm={}; cs.forEach(c=>{ if(c.monto>0) bm[c.medio]=(bm[c.medio]||0)+c.monto; }); const ds=cs.reduce((a,c)=>a+(c.descuento||0),0);
       return `<div><span>Cobros de cuentas corrientes (${cs.filter(c=>c.monto>0).length})</span><b>${fmt(cs.reduce((a,c)=>a+c.monto,0))}</b></div>`+Object.keys(bm).map(m=>`<div><span>&nbsp;&nbsp;Cobros CC · ${m}</span><b>${fmt(bm[m])}</b></div>`).join("")+(ds?`<div><span>&nbsp;&nbsp;Descuentos en cobros CC</span><b style="color:var(--off)">−${fmt(ds)}</b></div>`:""); })();
   $("hist").innerHTML = vs.slice().reverse().map(v=>`<div class="${v.nc?"ncv":""}"><span>${v.nc?"NC ":""}#${v.nro} · ${v.hora} · ${v.cajero} · ${v.pago} · ${v.comp}</span><b>${fmt(v.total)}</b></div>`).join("") || '<div style="color:var(--muted)">Todavía no hay ventas en este turno.</div>';
 }
@@ -1541,8 +1556,34 @@ const BILLETES=[20000,10000,2000,1000,500,200,100,50,20,10];
 const MEDIOS_DECL=["Débito","Crédito","QR","Transferencia"];
 let cierres=[]; try { cierres=JSON.parse(localStorage.getItem("cajaCierres")||"[]"); } catch(e) {}
 let ciMovs=[];
-const abiertas = () => ventas.filter(v=>v.caja===$("caja").value && v.turno===$("turno").value && v.fecha===hoy() && !v.cierre);
-const cobrosAb = () => cobros.filter(c=>c.caja===$("caja").value && c.turno===$("turno").value && c.fecha===hoy() && !c.cierre);
+// Qué entra en el cierre (Gustavo 23/11): TODO lo de esta caja desde su cierre anterior, sin mirar turno ni fecha.
+// Cierra uno y el otro sigue vendiendo; el turno de la noche que pasa las 12 entra entero. El cierre anterior se busca
+// en esta compu y en la nube (por si cerró otra compu o esta perdió datos).
+let CIERRES_NUBE=[];
+const tsCierre = c => +c.ts || (/^C\d{12,}$/.test(c.id||"") ? +c.id.slice(1) : 0);
+function ultimoCierreTs(caja){ let m=0; cierres.concat(CIERRES_NUBE).forEach(c=>{ if(c && c.caja===caja){ const t=tsCierre(c); if(t>m) m=t; } }); return m; }
+function abiertasDe(arr, caja){ const desde=ultimoCierreTs(caja);   // sin límite de horas: todo desde el cierre anterior
+  return arr.filter(v=>v && v.caja===caja && !v.cierre && (v.ts ? v.ts>desde : v.fecha===hoy())); }
+const abiertas = () => abiertasDe(ventas, $("caja").value);
+const cobrosAb = () => abiertasDe(cobros, $("caja").value);
+// Al abrir el cierre: trae de la nube los cierres de hoy y ayer y las ventas/cobros de esta caja que no estén en esta compu.
+const fbGet = async p => { const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),8000);
+  try { const r=await fetch(`${FB_URL}/${FB_K}/${p}.json`,{cache:"no-store",signal:ctl.signal}); return r.ok ? await r.json() : null; } finally { clearTimeout(t); } };
+async function traerTurnoNube(){
+  const caja=$("caja").value, dias=[diaISO(Date.now()-864e5), diaISO(new Date())];
+  const cs=[]; for (const d of dias){ const x=await fbGet(`dias/${d}/cierres`); if (x) Object.values(x).forEach(c=>{ if(c) cs.push(c); }); }
+  CIERRES_NUBE=cs;
+  let n=0;
+  for (const [tipo,arr] of [["ventas",ventas],["cobros",cobros]]){
+    const ids=new Set(arr.map(o=>o&&o.id));
+    for (const d of dias){ const x=await fbGet(`dias/${d}/${tipo}`); if (!x) continue;
+      Object.values(x).forEach(o=>{ if (o && o.id && o.caja===caja && !o.cierre && !ids.has(o.id)){ ids.add(o.id); Array.prototype.push.call(arr,o); if(tipo==="ventas") n++; } }); }
+  }
+  if (n){ ventas.sort((a,b)=>(a.ts||0)-(b.ts||0)); guardar(); }
+  try { localStorage.setItem("cajaCobrosCC",JSON.stringify(cobros)); } catch(e) {}
+  return n;
+}
+setTimeout(()=>{ traerTurnoNube().then(()=>{ try{ render(); }catch(e){} }).catch(()=>{}); }, 15000);
 function sistemaCaja(vs0,cs0){
   const vs=vs0||abiertas(), cs=cs0||cobrosAb(), s={};
   const MS=["Efectivo",...MEDIOS_DECL,"Cuenta corriente"], nz=x=>String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
@@ -1557,7 +1598,8 @@ function porComp(vs){ const m={"Factura B":0,"Factura A":0,"Remito interno":0}; 
 function htmlPorComp(pc){ return `<div class="label" style="margin-top:10px">Ventas del turno por comprobante</div>`+Object.keys(pc.m).map(k=>`<div class="tl num"><span>${k}</span><span>${fmt(pc.m[k])}</span></div>`).join("")+(pc.nc?`<div class="tl num"><span>Notas de crédito / devoluciones</span><span>−${fmt(pc.nc)}</span></div>`:"")+`<div class="tl num" style="font-weight:700"><span>TOTAL VENDIDO (facturas + remitos)</span><span>${fmt(pc.total)}</span></div>`+(pc.ci?`<div class="tl num" style="color:var(--muted)"><span>Bajas de productos (no cobrado, a precio de lista)</span><span>${fmt(pc.ci)}</span></div>`:""); }
 function abrirCierre(){
   ciMovs=[]; $("ciQuien").value=$("cajero").value; $("ciFondo").value=fondosAb().length?totFondos():($("ciFondo").value||"");
-  $("ciCab").innerHTML=`${$("caja").value} · turno ${$("turno").value} · ${hoy()} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`+htmlPorComp(porComp(abiertas()));
+  const ucT=ultimoCierreTs($("caja").value), desdeTxt=ucT ? " · desde el cierre anterior ("+new Date(ucT).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+")" : "";
+  $("ciCab").innerHTML=`${$("caja").value}${desdeTxt} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`+htmlPorComp(porComp(abiertas()));
   $("ciBill").innerHTML=BILLETES.map(b=>`<label for="ciB${b}"><b>$${b.toLocaleString("es-AR")}</b><i aria-hidden="true">×</i><input id="ciB${b}" type="number" min="0" step="1" inputmode="numeric" data-b="${b}"><span id="ciBt${b}">$ 0</span></label>`).join("")+
     `<label for="ciMon"><b>Monedas</b><i aria-hidden="true">$</i><input id="ciMon" type="number" min="0" step="10" inputmode="numeric"><span></span></label>`;
   $("ciArq").innerHTML=`<span class="h">Medio</span><span class="h">Según sistema</span><span class="h">Declarado</span><span class="h">Diferencia</span>`+
@@ -1591,7 +1633,7 @@ function confirmarCierre(){
   if (falta.length){ aviso("Falta declarar: "+falta.join(", ")+". Si no hubo, poné 0."); $("ciDec"+falta[0]).focus(); return; }
   const r=calcCierre(), id="C"+Date.now(), vs=abiertas(), cs=cobrosAb();
   const billetes={}; BILLETES.forEach(b=>{ const n=+$("ciB"+b).value||0; if(n) billetes[b]=n; });
-  const c={id, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien, responsable:$("cajero").value, fondo:r.fondo, ingresosFondos:fondosAb().map(f=>({hora:f.hora,concepto:f.concepto,quien:f.quien,monto:f.monto})), movimientos:ciMovs.slice(),
+  const c={id, ts:+id.slice(1), desde:ultimoCierreTs($("caja").value)||null, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien, responsable:$("cajero").value, fondo:r.fondo, ingresosFondos:fondosAb().map(f=>({hora:f.hora,concepto:f.concepto,quien:f.quien,monto:f.monto})), movimientos:ciMovs.slice(),
     billetes, monedas:+$("ciMon").value||0, sistema:r.sis, declarado:r.dec, diferencia:r.dif, ventaCuentaCorriente:r.cc,
     comprobantes:vs.length, notasCredito:vs.filter(v=>v.nc).length, totalComprobantes:porComp(vs).total, porComp:porComp(vs), obs:$("ciObs").value.trim()};
   vs.forEach(v=>v.cierre=id); cs.forEach(x=>x.cierre=id); fondosAb().forEach(f=>f.cierre=id); guardarFondos(); cierres.push(c);
@@ -1642,7 +1684,9 @@ function pintarHistCierres(){
   $("ciHist").innerHTML = cierres.slice().reverse().map(c=>{ const d=Object.values(c.diferencia).filter(x=>x!=null).reduce((a,x)=>a+x,0);
     return `<div><span>${c.fecha} ${c.hora.slice(0,5)} · ${c.caja} · ${c.turno} · cerró ${c.quien}</span><b style="color:${Math.abs(d)<1?"var(--accent)":"var(--off)"}">${Math.abs(d)<1?"sin diferencia":(d>0?"sobrante +":"faltante −")+fmt(Math.abs(d))}</b> <button class="btn" type="button" data-impc="${c.id}" style="padding:2px 8px">🖨</button></div>`; }).join("") || '<div style="color:var(--muted)">Todavía no hay cierres.</div>';
 }
-$("btnCierre").addEventListener("click", ()=>abrirCierre());
+$("btnCierre").addEventListener("click", async ()=>{ const b=$("btnCierre"); if (b.disabled) return; b.disabled=true; let n=0;
+  try { aviso("Buscando en la nube las ventas del turno…"); n=await traerTurnoNube(); } catch(e) { aviso("Sin conexión con la nube: el cierre se arma con lo que hay en esta compu."); }
+  b.disabled=false; abrirCierre(); if (n) aviso(`Se agregaron al cierre ${n} venta(s) de esta caja que faltaban en esta compu.`); });
 let FONDOS=[]; try{ FONDOS=JSON.parse(localStorage.getItem("cajaFondos")||"[]"); }catch(e){}
 const guardarFondos=()=>{ try{ localStorage.setItem("cajaFondos",JSON.stringify(FONDOS)); }catch(e){} };
 const fondosAb=()=>FONDOS.filter(f=>!f.cierre && f.caja===$("caja").value);
