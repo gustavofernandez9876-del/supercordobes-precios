@@ -1565,6 +1565,15 @@ function ultimoCierreTs(caja){ let m=0; cierres.concat(CIERRES_NUBE).forEach(c=>
 function abiertasDe(arr, caja){ const desde=ultimoCierreTs(caja);   // sin límite de horas: todo desde el cierre anterior
   return arr.filter(v=>v && v.caja===caja && !v.cierre && (v.ts ? v.ts>desde : v.fecha===hoy())); }
 const abiertas = () => abiertasDe(ventas, $("caja").value);
+// Ventas de OTRO cajero dentro del cierre (Gustavo 23/11): quiere decir que ese cajero no cerró su turno (o su cierre
+// falló). Entran igual en este cierre, pero queda marcado con su nombre, cuántas ventas, cuánto y en qué horario.
+function otrosCajeros(vs, resp){ const o={}; vs.forEach(v=>{ if(v.baja) return; const n=v.cajero||"Sin nombre"; if(n===resp) return;
+    const x=o[n]=o[n]||{cajero:n,ventas:0,total:0,desde:v.ts||0,hasta:v.ts||0}; x.ventas++; x.total+=v.nc?-(+v.total||0):(+v.total||0);
+    if(v.ts&&(!x.desde||v.ts<x.desde)) x.desde=v.ts; if(v.ts&&v.ts>x.hasta) x.hasta=v.ts; });
+  return Object.values(o).sort((a,b)=>a.desde-b.desde); }
+const hhmm = t => t ? new Date(t).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "?";
+const txtOtro = x => `${x.cajero} NO CERRÓ SU TURNO: ${x.ventas} venta(s) por ${fmt(x.total)} (${hhmm(x.desde)} a ${hhmm(x.hasta)})`;
+function htmlOtros(l){ return l.length ? `<div style="margin-top:8px;padding:8px;border:2px solid var(--off);border-radius:8px;color:var(--off)"><b>⚠ Este cierre incluye ventas de otro cajero</b>${l.map(x=>`<div>${escH(txtOtro(x))}</div>`).join("")}<small>Quedan marcadas en el cierre con su nombre.</small></div>` : ""; }
 const cobrosAb = () => abiertasDe(cobros, $("caja").value);
 // Al abrir el cierre: trae de la nube los cierres de hoy y ayer y las ventas/cobros de esta caja que no estén en esta compu.
 const fbGet = async p => { const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),8000);
@@ -1599,7 +1608,7 @@ function htmlPorComp(pc){ return `<div class="label" style="margin-top:10px">Ven
 function abrirCierre(){
   ciMovs=[]; $("ciQuien").value=$("cajero").value; $("ciFondo").value=fondosAb().length?totFondos():($("ciFondo").value||"");
   const ucT=ultimoCierreTs($("caja").value), desdeTxt=ucT ? " · desde el cierre anterior ("+new Date(ucT).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+")" : "";
-  $("ciCab").innerHTML=`${$("caja").value}${desdeTxt} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`+htmlPorComp(porComp(abiertas()));
+  $("ciCab").innerHTML=`${$("caja").value}${desdeTxt} · ${abiertas().length} comprobantes y ${cobrosAb().length} cobros de cuenta corriente sin cerrar`+htmlOtros(otrosCajeros(abiertas(),$("cajero").value))+htmlPorComp(porComp(abiertas()));
   $("ciBill").innerHTML=BILLETES.map(b=>`<label for="ciB${b}"><b>$${b.toLocaleString("es-AR")}</b><i aria-hidden="true">×</i><input id="ciB${b}" type="number" min="0" step="1" inputmode="numeric" data-b="${b}"><span id="ciBt${b}">$ 0</span></label>`).join("")+
     `<label for="ciMon"><b>Monedas</b><i aria-hidden="true">$</i><input id="ciMon" type="number" min="0" step="10" inputmode="numeric"><span></span></label>`;
   $("ciArq").innerHTML=`<span class="h">Medio</span><span class="h">Según sistema</span><span class="h">Declarado</span><span class="h">Diferencia</span>`+
@@ -1635,14 +1644,14 @@ function confirmarCierre(){
   const billetes={}; BILLETES.forEach(b=>{ const n=+$("ciB"+b).value||0; if(n) billetes[b]=n; });
   const c={id, ts:+id.slice(1), desde:ultimoCierreTs($("caja").value)||null, fecha:hoy(), hora:hora(), caja:$("caja").value, turno:$("turno").value, quien, responsable:$("cajero").value, fondo:r.fondo, ingresosFondos:fondosAb().map(f=>({hora:f.hora,concepto:f.concepto,quien:f.quien,monto:f.monto})), movimientos:ciMovs.slice(),
     billetes, monedas:+$("ciMon").value||0, sistema:r.sis, declarado:r.dec, diferencia:r.dif, ventaCuentaCorriente:r.cc,
-    comprobantes:vs.length, notasCredito:vs.filter(v=>v.nc).length, totalComprobantes:porComp(vs).total, porComp:porComp(vs), obs:$("ciObs").value.trim()};
+    otrosCajeros:otrosCajeros(vs,$("cajero").value), comprobantes:vs.length, notasCredito:vs.filter(v=>v.nc).length, totalComprobantes:porComp(vs).total, porComp:porComp(vs), obs:$("ciObs").value.trim()};
   vs.forEach(v=>v.cierre=id); cs.forEach(x=>x.cierre=id); fondosAb().forEach(f=>f.cierre=id); guardarFondos(); cierres.push(c);
   guardar(); try { localStorage.setItem("cajaCobrosCC",JSON.stringify(cobros)); localStorage.setItem("cajaCierres",JSON.stringify(cierres)); } catch(e) {}
   $("ciModal").hidden=true; $("ciObs").value="";
   const fila=(m)=>`<div class="tl num"><span>${m}</span><span>${fmt(c.sistema[m])} → ${c.declarado[m]==null?"—":fmt(c.declarado[m])} <b style="color:${c.diferencia[m]==null||Math.abs(c.diferencia[m])<1?"var(--accent)":"var(--off)"}">${c.diferencia[m]==null?"":(c.diferencia[m]>0?"+":c.diferencia[m]<0?"−":"")+fmt(Math.abs(c.diferencia[m]))}</b></span></div>`;
   $("ticket").innerHTML=`<h3>Caja cerrada</h3><div style="color:var(--muted)">${c.caja} · turno ${c.turno} · ${c.fecha} ${c.hora}</div><hr>
     <div class="tl"><span>Cerró</span><b>${c.quien}</b></div><div class="tl"><span>Responsable del turno</span><span>${c.responsable}</span></div>
-    <div class="tl num"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""} · ${fmt(c.totalComprobantes)}</span></div><hr>
+    <div class="tl num"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""} · ${fmt(c.totalComprobantes)}</span></div>${htmlOtros(c.otrosCajeros||[])}<hr>
     ${c.porComp?htmlPorComp(c.porComp)+"<hr>":""}
     <div class="tl num"><span><b>Fondos ingresados</b></span><b>${fmt(c.fondo)}</b></div>${(c.ingresosFondos||[]).map(f=>`<div class="tl num" style="font-size:13px"><span>  ${f.hora.slice(0,5)} · ${f.concepto} · ${f.quien}</span><span>+${fmt(f.monto)}</span></div>`).join("")}
     ${c.movimientos.map(x=>`<div class="tl num"><span>${x.tipo}: ${x.concepto}</span><span>−${fmt(x.monto)}</span></div>`).join("")}
@@ -1665,6 +1674,7 @@ function imprimirCierre(c){
   <div class="c t">SUPERCORDOBES</div><div class="c">CIERRE DE CAJA</div><hr>
   <div>${esc(c.caja)} · turno ${esc(c.turno)}</div><div>${esc(c.fecha)} ${esc(c.hora)}</div>
   <div>Cerró: ${esc(c.quien)}</div><div>Responsable: ${esc(c.responsable)}</div><hr>
+  ${(c.otrosCajeros||[]).length?`<div><b>ATENCION: INCLUYE VENTAS DE OTRO CAJERO</b></div>${c.otrosCajeros.map(x=>`<div class="s">${esc(txtOtro(x))}</div>`).join("")}<hr>`:""}
   <div class="r"><span>Comprobantes</span><span>${c.comprobantes}${c.notasCredito?` (${c.notasCredito} NC)`:""}</span></div>
   ${c.porComp?Object.keys(c.porComp.m).map(k=>`<div class="r s"><span>${k}</span><span>${fmt(c.porComp.m[k])}</span></div>`).join("")+(c.porComp.nc?`<div class="r s"><span>Notas de crédito</span><span>−${fmt(c.porComp.nc)}</span></div>`:""):""}
   <div class="r"><b>Total vendido (fact.+remitos)</b><b>${fmt(c.totalComprobantes)}</b></div>
@@ -1682,7 +1692,7 @@ function imprimirCierre(c){
 }
 function pintarHistCierres(){
   $("ciHist").innerHTML = cierres.slice().reverse().map(c=>{ const d=Object.values(c.diferencia).filter(x=>x!=null).reduce((a,x)=>a+x,0);
-    return `<div><span>${c.fecha} ${c.hora.slice(0,5)} · ${c.caja} · ${c.turno} · cerró ${c.quien}</span><b style="color:${Math.abs(d)<1?"var(--accent)":"var(--off)"}">${Math.abs(d)<1?"sin diferencia":(d>0?"sobrante +":"faltante −")+fmt(Math.abs(d))}</b> <button class="btn" type="button" data-impc="${c.id}" style="padding:2px 8px">🖨</button></div>`; }).join("") || '<div style="color:var(--muted)">Todavía no hay cierres.</div>';
+    return `<div><span>${c.fecha} ${c.hora.slice(0,5)} · ${c.caja} · ${c.turno} · cerró ${c.quien}${(c.otrosCajeros||[]).length?` <b style="color:var(--off)">⚠ incluye ventas de ${c.otrosCajeros.map(x=>x.cajero).join(", ")} (no cerró)</b>`:""}</span><b style="color:${Math.abs(d)<1?"var(--accent)":"var(--off)"}">${Math.abs(d)<1?"sin diferencia":(d>0?"sobrante +":"faltante −")+fmt(Math.abs(d))}</b> <button class="btn" type="button" data-impc="${c.id}" style="padding:2px 8px">🖨</button></div>`; }).join("") || '<div style="color:var(--muted)">Todavía no hay cierres.</div>';
 }
 $("btnCierre").addEventListener("click", async ()=>{ const b=$("btnCierre"); if (b.disabled) return; b.disabled=true; let n=0;
   try { aviso("Buscando en la nube las ventas del turno…"); n=await traerTurnoNube(); } catch(e) { aviso("Sin conexión con la nube: el cierre se arma con lo que hay en esta compu."); }
