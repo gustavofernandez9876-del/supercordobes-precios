@@ -1228,7 +1228,7 @@ function renderTurno(){
     `<div><span>Notas de crédito (${vs.filter(v=>v.nc).length})</span><b style="color:var(--off)">${fmt(vs.filter(v=>v.nc).reduce((a,v)=>a+v.total,0))}</b></div>` +
     (()=>{ let cs; try { cs=abiertasDe(cobros,caja); } catch(e) { cs=cobros.filter(c=>c.caja===caja&&c.turno===turno&&c.fecha===hoy()&&!c.cierre); } const bm={}; cs.forEach(c=>{ if(c.monto>0) bm[c.medio]=(bm[c.medio]||0)+c.monto; }); const ds=cs.reduce((a,c)=>a+(c.descuento||0),0);
       return `<div><span>Cobros de cuentas corrientes (${cs.filter(c=>c.monto>0).length})</span><b>${fmt(cs.reduce((a,c)=>a+c.monto,0))}</b></div>`+Object.keys(bm).map(m=>`<div><span>&nbsp;&nbsp;Cobros CC · ${m}</span><b>${fmt(bm[m])}</b></div>`).join("")+(ds?`<div><span>&nbsp;&nbsp;Descuentos en cobros CC</span><b style="color:var(--off)">−${fmt(ds)}</b></div>`:""); })();
-  $("hist").innerHTML = vs.slice().reverse().map(v=>`<div class="${v.nc?"ncv":""}"><span>${v.nc?"NC ":""}#${v.nro} · ${v.hora} · ${v.cajero} · ${v.pago} · ${v.comp}</span><b>${fmt(v.total)}</b></div>`).join("") || '<div style="color:var(--muted)">Todavía no hay ventas en este turno.</div>';
+  $("hist").innerHTML = vs.slice().reverse().map(v=>`<div class="${v.nc?"ncv":""}" data-vid="${escH(v.id||"")}" style="cursor:pointer" title="Clic para ver la venta o corregir la forma de pago"><span>${v.nc?"NC ":""}#${v.nro} · ${v.hora} · ${v.cajero} · ${v.pago} · ${v.comp}</span><b>${fmt(v.total)}</b></div>`).join("") || '<div style="color:var(--muted)">Todavía no hay ventas en este turno.</div>';
 }
 
 const hoy = () => new Date().toLocaleDateString("es-AR");
@@ -1996,13 +1996,66 @@ function pintarComprob(){
 }
 $("coChips").addEventListener("click",e=>{ const b=e.target.closest("[data-f]"); if(b){ coFiltro=b.dataset.f; pintarComprob(); }});
 $("coQ").addEventListener("input",pintarComprob);
-$("coTb").addEventListener("click",e=>{ const tr=e.target.closest("[data-nro]"); if(!tr) return; const v=ventas.find(x=>String(x.nro)===tr.dataset.nro); if(!v) return;
+$("coTb").addEventListener("click",e=>{ const tr=e.target.closest("[data-nro]"); if(!tr) return; const v=ventas.find(x=>String(x.nro)===tr.dataset.nro); if(!v) return; verVenta(v); });
+// Detalle de una venta (Comprobantes y "Turno en curso"), con "Corregir forma de pago" (Gustavo 24/11).
+function verVenta(v){
+  const sePuede = !v.nc && !v.baja && v.comp!=="Consumo interno";
+  const cambios = (v.cambiosPago||[]).map(c=>`<div class="tl" style="font-size:12px;color:var(--off)"><span>Pago corregido ${escH(c.dia)} ${escH((c.hora||"").slice(0,5))} por ${escH(c.quien)}${c.autorizo?` (autorizó ${escH(c.autorizo)})`:""}</span><span>${escH(c.de)} → ${escH(c.a)}</span></div>`).join("");
   $("ticket").innerHTML=`<h3>${escH(v.comp)} #${v.nro}</h3><div style="color:var(--muted)">${v.fecha} ${v.hora} · ${escH(v.caja)} · ${escH(v.cajero)}${v.ref?` · sobre comprobante #${v.ref}`:""}</div><hr>`+
     v.items.map(i=>`<div class="tl num"><span>${i.q} ${escH(i.desc)}</span><span>${fmt(i.importe)}</span></div>`).join("")+
     `<hr><div class="tl num" style="font-size:20px;font-weight:700"><span>TOTAL</span><span>${fmt(v.total)}</span></div><div class="tl"><span>${escH(v.pago)}</span><span>${escH(v.clienteFA?.razon||v.cliente||"Consumidor final")}</span></div>`+
     (v.motivo?`<div class="tl"><span>Motivo</span><span>${escH(v.motivo)}</span></div><div class="tl"><span>Autorizó</span><span>${escH(v.autorizo)}</span></div>`:"")+
-    `<button class="btn primary" id="btnReimp" type="button" style="width:100%;margin-top:14px">🖨 Reimprimir ticket</button><button class="btn" id="btnVolverNC" type="button" style="width:100%;margin-top:6px">Cerrar</button>`;
-  $("modal").hidden=false; $("btnReimp").onclick=()=>{ try{ imprimirTicket(v); }catch(e){ aviso("No se pudo imprimir: "+e.message); } }; });
+    (v.pagos&&v.pagos.length?v.pagos.map(x=>`<div class="tl num" style="font-size:13px"><span>  ${escH(x.medio)}</span><span>${fmt(x.monto)}</span></div>`).join(""):"")+cambios+
+    (sePuede?`<button class="btn" id="btnCorrPago" type="button" style="width:100%;margin-top:14px">💳 Corregir forma de pago</button>`:"")+
+    `<button class="btn primary" id="btnReimp" type="button" style="width:100%;margin-top:6px">🖨 Reimprimir ticket</button><button class="btn" id="btnVolverNC" type="button" style="width:100%;margin-top:6px">Cerrar</button>`;
+  $("modal").hidden=false; $("btnReimp").onclick=()=>{ try{ imprimirTicket(v); }catch(e){ aviso("No se pudo imprimir: "+e.message); } };
+  if (sePuede) $("btnCorrPago").onclick=()=>corregirPago(v);
+}
+const MEDIOS_CORR=["Efectivo","Débito","Crédito","QR","Transferencia","Cuenta corriente"];
+function corregirPago(v){
+  const partes = (v.pagos&&v.pagos.length) ? v.pagos.map(x=>({medio:x.medio,monto:+x.monto||0})) : [{medio:v.pago,monto:v.total}];
+  const ccOpts = CC.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(c=>`<option value="${escH(c.id)}"${c.nombre===v.cliente?" selected":""}>${escH(c.nombre)}${estadoCC(c).bloq?" (cortada)":""}</option>`).join("");
+  $("ticket").innerHTML=`<h3>Corregir forma de pago · #${v.nro}</h3><div style="color:var(--muted)">${v.fecha} ${v.hora} · ${escH(v.caja)} · ${escH(v.cajero)} · total ${fmt(v.total)}</div><hr>
+    <div class="hint">Se corrige solo el medio de pago: el importe cobrado no cambia. Queda registrado quién lo corrigió y se le avisa a Gustavo.${v.cierre?" <b>Esta venta ya está en un cierre de caja: hace falta la clave de Gustavo.</b>":""}</div>`+
+    partes.map((p,i)=>`<div class="tl" style="margin-top:8px;align-items:center"><span>${partes.length>1?`Parte ${i+1} · ${fmt(p.monto)}`:fmt(p.monto)}<br><small style="color:var(--muted)">ahora: ${escH(p.medio)}</small></span>
+      <select id="cpM${i}" aria-label="Nuevo medio de pago">${MEDIOS_CORR.map(m=>`<option${m===p.medio?" selected":""}>${m}</option>`).join("")}</select></div>`).join("")+
+    `<div id="cpCCbox" hidden style="margin-top:8px"><label for="cpCC" class="label">Cuenta corriente de</label><select id="cpCC" style="width:100%">${ccOpts}</select></div>
+    <button class="btn primary" id="cpOk" type="button" style="width:100%;margin-top:14px">Guardar corrección</button><button class="btn" id="cpNo" type="button" style="width:100%;margin-top:6px">Cancelar</button>`;
+  const hayCC=()=>partes.some((p,i)=>$("cpM"+i).value==="Cuenta corriente");
+  const pintaCC=()=>{ $("cpCCbox").hidden=!hayCC(); }; partes.forEach((p,i)=>$("cpM"+i).addEventListener("change",pintaCC)); pintaCC();
+  $("cpNo").onclick=()=>verVenta(v);
+  $("cpOk").onclick=async()=>{
+    const nuevas=partes.map((p,i)=>({medio:$("cpM"+i).value,monto:p.monto}));
+    const de=partes.map(p=>p.medio).join(" + "), a=nuevas.map(p=>p.medio).join(" + ");
+    if (nuevas.every((p,i)=>p.medio===partes[i].medio)){ aviso("No cambiaste ningún medio de pago."); return; }
+    let autorizo="";
+    if (v.cierre){ let u=null; if (confiable()) u=AUTORIZADOS[0]; else { const k=prompt("La venta #"+v.nro+" ya está en un cierre de caja.\nClave de Gustavo para corregir el pago:"); if(k===null) return; u=await autorizado(k); }
+      if(!u){ registrarIntento("Corregir forma de pago de la venta #"+v.nro+" (ya cerrada)"); aviso("Clave incorrecta. Este intento queda registrado y se le avisa a Gustavo."); return; } autorizo=u.nombre; }
+    const mCCantes=partes.filter(p=>p.medio==="Cuenta corriente").reduce((s,p)=>s+p.monto,0), mCCdesp=nuevas.filter(p=>p.medio==="Cuenta corriente").reduce((s,p)=>s+p.monto,0);
+    let cliNuevo=null;
+    if (mCCdesp>0){ cliNuevo=CC.find(c=>c.id===$("cpCC").value); if(!cliNuevo){ aviso("Elegí la cuenta corriente."); return; }
+      if (estadoCC(cliNuevo).bloq && cliNuevo.nombre!==v.cliente){ aviso("La cuenta de "+cliNuevo.nombre+" está cortada."); return; } }
+    const cliViejo = mCCantes>0 ? CC.find(c=>c.nombre===v.cliente) : null;
+    const hoyI=diaISO(new Date());
+    // Cuenta corriente: se saca la deuda de la cuenta vieja y se carga en la nueva (si es la misma cuenta, solo la diferencia).
+    if (cliViejo && mCCantes>0 && !(cliNuevo && cliNuevo.id===cliViejo.id && mCCdesp===mCCantes)){
+      cliViejo.saldo-=mCCantes; cliViejo.movs.push({fecha:hoyI, tipo:"Corrección: venta #"+v.nro+" pagada con "+a, monto:-mCCantes, venta:v.nro}); }
+    if (cliNuevo && mCCdesp>0 && !(cliViejo && cliNuevo.id===cliViejo.id && mCCdesp===mCCantes)){
+      if (cliNuevo.saldo<=0) cliNuevo.desde=hoyI; cliNuevo.saldo+=mCCdesp;
+      cliNuevo.movs.push({fecha:hoyI, tipo:"Compra (corrección de pago, venta #"+v.nro+")", monto:mCCdesp, venta:v.nro}); (cliNuevo.boletas=cliNuevo.boletas||[]).push({tipo:"Caja", nro:"#"+v.nro, fecha:hoyI, total:v.total, deuda:mCCdesp}); }
+    if (cliViejo||cliNuevo) guardarCC();
+    const quien=$("cajero").value.trim()||"Sin nombre";
+    (v.cambiosPago=v.cambiosPago||[]).push({fecha:new Date().toISOString(), dia:hoy(), hora:hora(), de, a, quien, autorizo, cajaCorrige:$("caja").value});
+    if (!v.pagoOriginal) v.pagoOriginal=de;
+    v.pago=a; v.pagos=nuevas.length>1?nuevas:null; v.cliente=cliNuevo?cliNuevo.nombre:(mCCdesp>0?v.cliente:"");
+    guardar(); try{ REG.encolar("ventas",v); }catch(e){} try{ recalcCierres(); }catch(e){}
+    registrarCambio(`forma de pago corregida en la venta #${v.nro} (${v.caja}, ${v.fecha} ${v.hora}, ${fmt(v.total)}, vendió ${v.cajero}): ${de} → ${a}${cliNuevo?" · a cuenta de "+cliNuevo.nombre:""}${cliViejo&&!cliNuevo?" · se sacó de la cuenta de "+cliViejo.nombre:""}. Corrigió ${quien}${autorizo?", autorizó "+autorizo:""}.`);
+    try{ render(); }catch(e){} try{ pintarComprob(); }catch(e){}
+    aviso("Venta #"+v.nro+": pago corregido de "+de+" a "+a+".");
+    verVenta(v);
+  };
+}
+$("hist").addEventListener("click",e=>{ const d=e.target.closest("[data-vid]"); if(!d) return; const v=ventas.find(x=>x.id===d.dataset.vid); if(v) verVenta(v); });
 
 function marcarFull(){ $("btnFull").textContent = document.fullscreenElement ? "Salir de pantalla completa" : "Pantalla completa"; }
 $("btnFull").addEventListener("click", ()=>{
