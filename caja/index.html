@@ -913,8 +913,19 @@ function agregarEtiqueta(e){
   if (e.desconocido) aviso("PLU "+e.cod+" de la balanza no está cargado en la caja: se cobra el importe de la etiqueta como VARIOS.");
   return true;
 }
+// Etiqueta de balanza POR UNIDAD (25/11): la Cuora imprime el mismo código 2050100002044 para todo producto por unidad
+// (no trae PLU ni importe). La caja pregunta cuál es. Cuando se corrija el formato en Systel, esto deja de hacer falta.
+const BAL_UNIDAD=["0484", "0155", "0165", "2404", "2722", "2730", "3175", "9670", "10028", "10128", "10059", "10060", "8792", "7780", "341960", "8036", "7301", "341970", "342039", "342301", "342302", "342303", "342304", "342305", "342306", "342307", "342308", "342309", "342310", "342311", "342312", "342066", "342067", "0906", "341964", "341962", "341961", "342384", "342387", "342388", "342391", "342392", "342549"];
+function elegirUnidad(){
+  const box=$("sugg"); selS=-1; $("scan").value="";
+  const lista=[...new Set(BAL_UNIDAD)].map(c=>porCod.get(c)).filter(p=>p&&!p.inactivo).sort((a,b)=>a.desc.localeCompare(b.desc));
+  box.innerHTML=`<div class="sgh"><b>Etiqueta de balanza por unidad:</b> la etiqueta no dice qué producto es · elegí cuál es (flechas y Enter, o un clic)</div>`+
+    lista.map(p=>`<button type="button" data-cod="${escH(p.cod)}"><span>${escH(p.desc)}<small>cód. ${escH(p.cod)}</small></span><span class="num">${p.precio>0?fmt(p.precio):'<b style="color:var(--off)">sin precio</b>'}</span></button>`).join("");
+  box.hidden=false; $("scan").focus();
+}
 function agregar(texto){
   let t = texto.trim(), q = 1;
+  if (/^0?2050100002044$/.test(t)){ elegirUnidad(); return false; }
   { const tt=t; if (!porBarra.get(tt)) { const e=leerEtiqueta(tt); if (e) return agregarEtiqueta(e); } }
   const m = t.match(/^([\d.,]+)\s*\*\s*(.+)$/);
   if (m){ q = parseFloat(m[1].replace(",", ".")); t = m[2]; }
