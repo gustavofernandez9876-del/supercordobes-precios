@@ -864,7 +864,12 @@ const BAL_DEF={prefijos:"20",dCod:4,dVal:6,modo:"precio",dec:2};
 let BAL=Object.assign({},BAL_DEF); try{ const g=JSON.parse(localStorage.getItem("cajaBal")||"{}"); if(g.v===3) Object.assign(BAL,g); }catch(e){}
 BAL.v=3;
 function guardarBal(){ try{ localStorage.setItem("cajaBal",JSON.stringify(BAL)); }catch(e){} }
+// Etiquetas de peso de La Serenísima (27/11): 20 dígitos "1287" + material(4) + gramos(6) + 6 de lote.
+// Ej. media horma de sardo sin lactosa "12874700001820337259" = material 4700, 1.820 g. Se cobra peso × precio por kilo del sistema.
+const LS_PESO={"4700":"341954"};
 function leerEtiqueta(t){
+  { const m=/^1287(\d{4})(\d{6})\d{6}$/.exec(t||""); if (m && LS_PESO[m[1]]){ const p=porCod.get(LS_PESO[m[1]]), kg=+m[2]/1000;
+      if (p && kg>0) return {p,cod:LS_PESO[m[1]],val: BAL.modo==="peso"? kg : Math.round(kg*(+p.precio||0)),score:10}; } }
   // Prueba varios formatos posibles de la Cuora Neo y se queda con el que da un producto de balanza y un peso razonable.
   if (!/^\d{13}$/.test(t) || t[0]!=="2") return null;
   const balSet=new Set(Object.values(BAL_PLU));
@@ -1327,7 +1332,7 @@ let autoT=null;
 $("scan").addEventListener("input", ()=>{
   clearTimeout(autoT);
   const v=$("scan").value.trim();
-  if (!/^\d{8,14}$/.test(v)) return;
+  if (!/^(\d{8,14}|1287\d{16})$/.test(v)) return;
   autoT=setTimeout(()=>{
     const w=$("scan").value.trim(); if (w!==v) return;
     const ok = porBarra.get(w) || porLector(w).filter(x=>!x.inactivo).length===1 || (typeof leerEtiqueta==="function" && leerEtiqueta(w));
