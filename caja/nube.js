@@ -128,7 +128,8 @@ function unirBoletas(bb, lb, rb){
   var ids = []; (lb||[]).concat(rb||[]).forEach(function(x){ var k = idB(x); if (ids.indexOf(k) < 0) ids.push(k); });
   return ids.map(function(k){
     var b = B.get(k), l = L.get(k), r = R.get(k);
-    if (!l) return r; if (!r) return l;
+    // Borrada en una caja o en la nube (y sin cambios en la otra): se borra en todas.
+    if (!l) return (b && clave(r) === clave(b)) ? null : r; if (!r) return (b && clave(l) === clave(b)) ? null : l;
     if (!b) return clave(l) === clave(r) ? l : (( (l.pagos||[]).length >= (r.pagos||[]).length) ? l : r);
     var x = Object.assign({}, l);
     x.pagos = unir3(b.pagos, l.pagos, r.pagos);
@@ -136,7 +137,7 @@ function unirBoletas(bb, lb, rb){
     if (x.deuda === 0) x.pagada = l.pagada || r.pagada || x.pagada; else delete x.pagada;
     if (!x.pagos.length) delete x.pagos;
     return x;
-  });
+  }).filter(function(x){ return x; });
 }
 function unirCuenta(b, l, r){
   if (!l) return r; if (!r) return l;
